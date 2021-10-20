@@ -194,6 +194,12 @@ void CgiParser::parse(WebRequest& request, ReadOption readOption)
 
   std::string queryString = request.queryString();
 
+  LOG_DEBUG("queryString (len=" << len << "): " << queryString);
+
+  if (!queryString.empty() && request_->parameters_.empty()) {
+    Http::Request::parseFormUrlEncoded(queryString, request_->parameters_);
+  }
+
   // XDomainRequest cannot set a contentType header, we therefore pass it
   // as a request parameter
   if (readOption != ReadHeadersOnly &&
@@ -209,12 +215,11 @@ void CgiParser::parse(WebRequest& request, ReadOption readOption)
       throw WException("Oversized application/x-www-form-urlencoded ("
 		       + std::to_string(len) + ")");
 
-    char *buf = new char[len + 1];
+    auto buf = std::unique_ptr<char[]>(new char[len + 1]);
 
-    request.in().read(buf, len);
+    request.in().read(buf.get(), len);
 
     if (request.in().gcount() != (int)len) {
-      delete[] buf;
       throw WException("Unexpected short read.");
     }
 
@@ -222,17 +227,18 @@ void CgiParser::parse(WebRequest& request, ReadOption readOption)
 
     // This is a special Wt feature, I do not think it standard.
     // For POST, parameters in url-encoded URL are still parsed.
-    if (!queryString.empty())
-      queryString += '&';
 
-    queryString += buf;
-    delete[] buf;
+    std::string formQueryString = buf.get();
+
+    LOG_DEBUG("formQueryString (len=" << len << "): " << formQueryString);
+    if (!formQueryString.empty()) {
+      Http::Request::parseFormUrlEncoded(formQueryString, request_->parameters_);
+    }
+    Http::ParameterMap::const_iterator it = request_->parameters_.find("Wt-params");
+    if (it != request_->parameters_.end() && it->second.size() == 1) {
+      Http::Request::parseFormUrlEncoded(it->second[0], request_->parameters_);
+    }
   }
-
-  LOG_DEBUG("queryString (len=" << len << "): " << queryString);
-
-  if (!queryString.empty())
-    Http::Request::parseFormUrlEncoded(queryString, request_->parameters_);
 
   if (readOption != ReadHeadersOnly &&
       type && strstr(type, "multipart/form-data") == type) {
@@ -252,11 +258,6 @@ void CgiParser::parse(WebRequest& request, ReadOption readOption)
 	len -= toRead;
       }
     }
-  }
-
-  Http::ParameterMap::const_iterator it = request_->parameters_.find("Wt-params");
-  if (it != request_->parameters_.end() && it->second.size() == 1) {
-    Http::Request::parseFormUrlEncoded(it->second[0], request_->parameters_);
   }
 }
 

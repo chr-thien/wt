@@ -124,8 +124,7 @@ int WDate::dayOfWeek() const
   if (!isValid())
     return 0;
 
-  unsigned dow = (unsigned)date::weekday(date::day(day())/month()/year());
-  return (dow == 0 ? 7 : dow);
+  return date::weekday(date::day(day())/month()/year()).iso_encoding();
 }
 
 int WDate::daysTo(const WDate& other) const
@@ -214,9 +213,7 @@ bool WDate::operator>= (const WDate& other) const
 
 WDate WDate::currentServerDate()
 {
-  date::sys_days dp = date::floor<date::days>(std::chrono::system_clock::now());
-  date::year_month_day ymd(dp);
-  return WDate((int)ymd.year(), (unsigned int)ymd.month(), (unsigned int)ymd.day());
+  return WLocalDateTime::currentServerDateTime().date();
 }
 
 WDate WDate::currentDate()

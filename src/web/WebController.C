@@ -40,6 +40,17 @@
 #include <algorithm>
 #include <csignal>
 
+namespace {
+  std::string str(const std::string *strPtr)
+  {
+    if (strPtr) {
+      return *strPtr;
+    } else {
+      return std::string();
+    }
+  }
+}
+
 namespace Wt {
 
 LOGGER("WebController");
@@ -153,17 +164,21 @@ Configuration& WebController::configuration()
 
 int WebController::sessionCount() const
 {
+#ifdef WT_THREADED
+  std::unique_lock<std::recursive_mutex> lock(mutex_);
+#endif
   return sessions_.size();
 }
 
-std::vector<std::string> WebController::sessions()
+std::vector<std::string> WebController::sessions(bool onlyRendered)
 {
 #ifdef WT_THREADED
   std::unique_lock<std::recursive_mutex> lock(mutex_);
 #endif
   std::vector<std::string> sessionIds;
   for (SessionMap::const_iterator i = sessions_.begin(); i != sessions_.end(); ++i) {
-    sessionIds.push_back(i->first);
+    if (!onlyRendered || i->second->app() != nullptr)
+      sessionIds.push_back(i->first);
   }
   return sessionIds;
 }
@@ -180,23 +195,17 @@ bool WebController::expireSessions()
     std::unique_lock<std::recursive_mutex> lock(mutex_);
 #endif // WT_THREADED
 
-    for (SessionMap::iterator i = sessions_.begin(); i != sessions_.end();) {
+    for (SessionMap::iterator i = sessions_.begin(); i != sessions_.end(); ++i) {
       std::shared_ptr<WebSession> session = i->second;
 
       int diff = session->expireTime() - now;
 
       if (diff < 1000 && configuration().sessionTimeout() != -1) {
 	toExpire.push_back(session);
-
-	if (session->env().ajax())
-	  --ajaxSessions_;
-	else
-	  --plainHtmlSessions_;
-
-	++zombieSessions_;
-	sessions_.erase(i++);
-      } else
-	++i;
+        // Note: the session is not yet removed from sessions_ map since
+        // we want to grab the UpdateLock to do this and grabbing it here
+        // might cause a deadlock.
+      }
     }
 
     result = !sessions_.empty();
@@ -208,6 +217,24 @@ bool WebController::expireSessions()
     LOG_INFO_S(session, "timeout: expiring");
     WebSession::Handler handler(session,
 				WebSession::Handler::LockOption::TakeLock);
+
+#ifdef WT_THREADED
+    std::unique_lock<std::recursive_mutex> lock(mutex_);
+#endif // WT_THREADED
+
+    // Another thread might have already removed it
+    if (sessions_.find(session->sessionId()) == sessions_.end())
+      continue;
+
+    if (session->env().ajax())
+      --ajaxSessions_;
+    else
+      --plainHtmlSessions_;
+
+    ++zombieSessions_;
+
+    sessions_.erase(session->sessionId());
+
     session->expire();
   }
 
@@ -467,9 +494,17 @@ bool WebController::requestDataReceived(WebRequest *request,
 
     std::string sessionId = *wtdE;
 
+    UpdateResourceProgressParams params {
+      str(request->getParameter("request")),
+      str(request->getParameter("resource")),
+      request->postDataExceeded(),
+      request->pathInfo(),
+      current,
+      total
+    };
     auto event = std::make_shared<ApplicationEvent>(sessionId,
                                                     std::bind(&WebController::updateResourceProgress,
-                                                              this, request, current, total));
+                                                              this, params));
 
     if (handleApplicationEvent(event))
       return !request->postDataExceeded();
@@ -480,29 +515,26 @@ bool WebController::requestDataReceived(WebRequest *request,
   return true;
 }
 
-void WebController::updateResourceProgress(WebRequest *request,
-					   std::uintmax_t current,
-					   std::uintmax_t total)
+void WebController::updateResourceProgress(const UpdateResourceProgressParams &params)
 {
   WApplication *app = WApplication::instance();
 
-  const std::string *requestE = request->getParameter("request");
-
   WResource *resource = nullptr;
-  if (!requestE && !request->pathInfo().empty())
-    resource = app->decodeExposedResource("/path/" + request->pathInfo());
+  if (!params.requestParam.empty() &&
+      !params.pathInfo.empty()) {
+    resource = app->decodeExposedResource("/path/" + params.pathInfo);
+  }
 
   if (!resource) {
-    const std::string *resourceE = request->getParameter("resource");
-    resource = app->decodeExposedResource(*resourceE);
+    resource = app->decodeExposedResource(params.resourceParam);
   }
 
   if (resource) {
-    ::int64_t dataExceeded = request->postDataExceeded();
+    ::int64_t dataExceeded = params.postDataExceeded;
     if (dataExceeded)
       resource->dataExceeded().emit(dataExceeded);
     else
-      resource->dataReceived().emit(current, total);
+      resource->dataReceived().emit(params.current, params.total);
   }
 }
 
@@ -748,6 +780,10 @@ void WebController::handleRequest(WebRequest *request)
 
 	sessions_[sessionId] = session;
 	++plainHtmlSessions_;
+
+        if (server_.dedicatedSessionProcess()) {
+          server_.updateProcessSessionId(sessionId);
+        }
       } catch (std::exception& e) {
 	LOG_ERROR_S(&server_, "could not create new session: " << e.what());
 	request->flush(WebResponse::ResponseState::ResponseDone);

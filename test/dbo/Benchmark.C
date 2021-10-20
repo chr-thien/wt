@@ -90,6 +90,8 @@ namespace Wt {
   }
 }
 
+BOOST_AUTO_TEST_SUITE( DBO_TEST_SUITE_NAME )
+
 BOOST_AUTO_TEST_CASE( performance_test )
 {
   DboBenchmarkFixture f;
@@ -104,7 +106,7 @@ BOOST_AUTO_TEST_CASE( performance_test )
   std::cerr << "Loading " << total_objects << " objects in database."
             << std::endl;
   for (unsigned i = 0; i < total_objects; ++i) {
-    auto p = Wt::cpp14::make_unique<Perf::Post>();
+    auto p = std::make_unique<Perf::Post>();
 
     p->id = i;
     p->text = text;
@@ -145,3 +147,4 @@ BOOST_AUTO_TEST_CASE( performance_test )
   //session.dropTables();
 }
 
+BOOST_AUTO_TEST_SUITE_END()

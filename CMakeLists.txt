@@ -11,7 +11,7 @@ SET(CMAKE_MODULE_PATH
 )
 
 SET(VERSION_SERIES 4)
-SET(VERSION_MAJOR 4)
+SET(VERSION_MAJOR 6)
 SET(VERSION_MINOR 0)
 
 IF(NOT SHARED_LIBS)
@@ -40,6 +40,7 @@ OPTION(ENABLE_MYSQL "Build mariadb/mysql backend for Wt::Dbo" ON)
 OPTION(ENABLE_MSSQLSERVER "Build Microsoft SQL Server backend for Wt::Dbo" ON)
 OPTION(ENABLE_QT4 "Build Qt4 interworking library (libwtwithqt)" ON)
 OPTION(ENABLE_QT5 "Build Qt5 interworking library (libwtwithqt5)" ON)
+OPTION(ENABLE_SAML "Build built-in SAML service provider for Wt::Auth" OFF)
 OPTION(ENABLE_LIBWTTEST "Build Wt::Test" ON)
 OPTION(ENABLE_LIBWTDBO "Build Wt::Dbo" ON)
 OPTION(WT_NO_STD_LOCALE "Build Wt to run on a system without std::locale support" OFF)
@@ -48,7 +49,7 @@ OPTION(ENABLE_OPENGL "Build Wt with support for server-side opengl rendering" ON
 OPTION(ENABLE_UNWIND "Build Wt with stacktrace support using libunwind" OFF)
 
 IF(NOT CMAKE_CXX_STANDARD)
-  SET(CMAKE_CXX_STANDARD 11)
+  SET(CMAKE_CXX_STANDARD 14)
 ENDIF(NOT CMAKE_CXX_STANDARD)
 SET(CMAKE_CXX_STANDARD_REQUIRED ON)
 SET(CMAKE_CXX_EXTENSIONS OFF)
@@ -252,6 +253,13 @@ INCLUDE(cmake/WtFindSkia.txt)
 set(OPENSSL_ROOT_DIR ${SSL_PREFIX})
 find_package(OpenSSL)
 
+IF (ENABLE_SAML)
+  find_package(OpenSAML)
+  if(OpenSAML_FOUND)
+    set(WT_HAS_SAML TRUE)
+  endif()
+ENDIF (ENABLE_SAML)
+
 IF (ENABLE_UNWIND)
   INCLUDE(cmake/WtFindUnwind.txt)
 ENDIF (ENABLE_UNWIND)
@@ -373,6 +381,19 @@ ELSEIF (${WT_CPP17_ANY_IMPLEMENTATION} STREQUAL "std")
 ELSE (${WT_CPP17_ANY_IMPLEMENTATION} STREQUAL "thelink2012")
   MESSAGE(FATAL_ERROR "WT_CPP17_ANY_IMPLEMENTATION must be one of thelink2012, experimental, or std")
 ENDIF (${WT_CPP17_ANY_IMPLEMENTATION} STREQUAL "thelink2012")
+
+SET(WT_CPP20_DATE_TZ_DEFAULT_IMPLEMENTATION "date")
+SET(WT_CPP20_DATE_TZ_IMPLEMENTATION ${WT_CPP20_DATE_TZ_DEFAULT_IMPLEMENTATION} CACHE STRING
+  "Implementation for Wt::cpp20::date. Defaults to \"date\": an included implementation of date and timezone support by Howard Hinnant. Use \"std\" for C++20's \"std::chrono\" implementation.")
+SET_PROPERTY(CACHE WT_CPP20_DATE_TZ_IMPLEMENTATION PROPERTY STRINGS date std)
+
+IF (${WT_CPP20_DATE_TZ_IMPLEMENTATION} STREQUAL "date")
+  SET(WT_DATE_TZ_USE_DATE ON)
+ELSEIF(${WT_CPP20_DATE_TZ_IMPLEMENTATION} STREQUAL "std")
+  SET(WT_DATE_TZ_USE_STD ON)
+ELSE()
+  MESSAGE(FATAL_ERROR "WT_CPP20_DATE_TZ_IMPLEMENTATION must be date or std")
+ENDIF()
 
 SET(WT_ASIO_DEFAULT_IMPLEMENTATION "boost")
 SET(WT_ASIO_IMPLEMENTATION ${WT_ASIO_DEFAULT_IMPLEMENTATION} CACHE STRING

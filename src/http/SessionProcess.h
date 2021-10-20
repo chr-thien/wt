@@ -21,13 +21,15 @@
 namespace http {
 namespace server {
 
+class SessionProcessManager;
+
 namespace asio = Wt::AsioWrapper::asio;
 
 class SessionProcess
   : public std::enable_shared_from_this<SessionProcess>
 {
 public:
-  SessionProcess(asio::io_service &io_service);
+  SessionProcess(SessionProcessManager *manager);
   SessionProcess(const SessionProcess&) = delete;
 
   void stop();
@@ -62,18 +64,19 @@ private:
 	    const std::function<void (bool)>& onReady);
   void acceptHandler(const Wt::AsioWrapper::error_code& err,
 		     const std::function<void (bool)>& onReady);
-  void readPortHandler(const Wt::AsioWrapper::error_code& err,
-		       std::size_t transferred,
-		       const std::function<void (bool)>& onReady);
+  void read();
+  void readHandler(const Wt::AsioWrapper::error_code& err,
+                   std::size_t bytes_transferred);
+  bool handleChildMessage(const std::string& message);
 
   // Short-lived objects during startup
   asio::io_service& io_service_;
   std::shared_ptr<asio::ip::tcp::socket> socket_;
   std::shared_ptr<asio::ip::tcp::acceptor> acceptor_;
 
-  int			   port_;
+  asio::streambuf          buf_;
 
-  char			   buf_[6];
+  int			   port_;
 
   std::string		   sessionId_;
 #ifndef WT_WIN32
@@ -81,6 +84,10 @@ private:
 #else // WT_WIN32
   PROCESS_INFORMATION      processInfo_;
 #endif // WT_WIN32
+
+  SessionProcessManager *manager_ = nullptr;
+
+  std::function<void (bool)> listeningCallback_;
 };
 
 } // namespace server

@@ -119,7 +119,7 @@ WebRenderer::WebRenderer(WebSession& session)
     currentStatelessSlotIsActuallyStateless_(true),
     formObjectsChanged_(true),
     updateLayout_(false),
-    multiSessionCookieUpdateNeeded_(false),
+    cookieUpdateNeeded_(false),
     learning_(false)
 { }
 
@@ -168,7 +168,7 @@ bool WebRenderer::isDirty() const
     || !collectedJS2_.empty()
     || !invisibleJS_.empty()
     || !wsRequestsToHandle_.empty()
-    || multiSessionCookieUpdateNeeded_;
+    || cookieUpdateNeeded_;
 }
 
 const WebRenderer::FormObjectsMap& WebRenderer::formObjects() const
@@ -508,6 +508,7 @@ void WebRenderer::setCookie(const std::string name, const std::string value,
 			    bool secure)
 {
   cookiesToSet_[name] = CookieValue(value, path, domain, expires, secure);
+  cookieUpdateNeeded_ = true;
 }
 
 void WebRenderer::setCaching(WebResponse& response, bool allowCache)
@@ -561,9 +562,7 @@ void WebRenderer::setHeaders(WebResponse& response, const std::string mimeType)
     else
       header << " Path=" << cookie.path << ';';
 
-    // a httponly cookie cannot be set using JavaScript
-    if (!response.isWebSocketMessage())
-      header << " httponly;";
+    header << " httponly;";
 
     if (cookie.secure)
       header << " secure;";
@@ -571,13 +570,7 @@ void WebRenderer::setHeaders(WebResponse& response, const std::string mimeType)
     response.addHeader("Set-Cookie", header.str());
   }
   cookiesToSet_.clear();
-
-#ifndef WT_TARGET_JAVA
-  const WServer *s = session_.controller()->server();
-  if (s->dedicatedSessionProcess()) {
-    response.addHeader("X-Wt-Session", session_.sessionId());
-  }
-#endif // WT_TARGET_JAVA
+  cookieUpdateNeeded_ = false;
 
   response.setContentType(mimeType);
 }
@@ -607,8 +600,10 @@ std::string WebRenderer::sessionUrl() const
 
 void WebRenderer::serveJavaScriptUpdate(WebResponse& response)
 {
-  setCaching(response, false);
-  setHeaders(response, "text/javascript; charset=UTF-8");
+  if (!response.isWebSocketMessage()) {
+    setCaching(response, false);
+    setHeaders(response, "text/javascript; charset=UTF-8");
+  }
 
   if (session_.sessionIdChanged_) {
     collectedJS1_ << session_.app()->javaScriptClass()
@@ -632,7 +627,7 @@ void WebRenderer::serveJavaScriptUpdate(WebResponse& response)
     out << collectedJS1_.str() << collectedJS2_.str();
 
     if (response.isWebSocketMessage()) {
-      renderMultiSessionCookieUpdate(out);
+      renderCookieUpdate(out);
       renderWsRequestsDone(out);
 
       LOG_DEBUG("jsSynced(false) after rendering websocket message");
@@ -669,12 +664,12 @@ void WebRenderer::updateMultiSessionCookie(const WebRequest &request)
             session_.env().urlScheme() == "https");
 }
 
-void WebRenderer::renderMultiSessionCookieUpdate(WStringStream &out)
+void WebRenderer::renderCookieUpdate(WStringStream &out)
 {
-  if (multiSessionCookieUpdateNeeded_) {
+  if (cookieUpdateNeeded_) {
     out << session_.app()->javaScriptClass()
-	<< "._p_.refreshCookie();";
-    multiSessionCookieUpdateNeeded_ = false;
+        << "._p_.refreshCookie();";
+    cookieUpdateNeeded_ = false;
   }
 }
 
@@ -1009,6 +1004,8 @@ void WebRenderer::serveMainscript(WebResponse& response)
     script.setVar("SESSION_URL", WWebWidget::jsStringLiteral(sessionUrl()));
     script.setVar("QUITTED_STR",
 		  WString::tr("Wt.QuittedMessage").jsStringLiteral());
+    script.setVar("MAX_FORMDATA_SIZE", conf.maxFormDataSize());
+    script.setVar("MAX_PENDING_EVENTS", conf.maxPendingEvents());
 
     std::string deployPath = session_.env().publicDeploymentPath_;
     if (deployPath.empty())

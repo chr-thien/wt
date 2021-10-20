@@ -230,6 +230,9 @@ WMenuItem *WMenu::insertItem(int index, std::unique_ptr<WMenuItem> item)
 
       if (contentsStack_->count() == 1) {
 	setCurrent(0);
+	if (loaded()) {
+	  currentItem()->loadContents();
+	}
         contentsStack_->setCurrentWidget(contents);
 
 	renderSelected(result, true);
@@ -293,6 +296,12 @@ void WMenu::setCurrent(int index)
 
 void WMenu::select(int index, bool changePath)
 {
+  if (parentItem_) {
+    auto parentItemMenu = parentItem_->parentMenu();
+    if (parentItemMenu->currentItem() != parentItem_ && parentItem_->isSelectable())
+      parentItemMenu->select(parentItemMenu->indexOf(parentItem_), false);
+  }
+  
   int last = current_;
   setCurrent(index);
 

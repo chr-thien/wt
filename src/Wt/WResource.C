@@ -68,7 +68,9 @@ WResource::UseLock::~UseLock()
 WResource::WResource()
   : trackUploadProgress_(false),
     takesUpdateLock_(false),
+    invalidAfterChanged_(false),
     dispositionType_(ContentDisposition::None),
+    version_(0),
     app_(nullptr)
 { 
 #ifdef WT_THREADED
@@ -265,7 +267,10 @@ void WResource::setInternalPath(const std::string& path)
 
   bool wasExposed = app && app->removeExposedResource(this);
 
-  internalPath_ = path;
+  if (!path.empty() && path[0] != '/') {
+    LOG_WARN("setInternalPath(): adding '/' to start of internal path: " + path);
+  }
+  internalPath_ = Utils::prepend(path, '/');
   currentUrl_.clear();
 
   if (wasExposed)
@@ -279,9 +284,15 @@ void WResource::setDispositionType(ContentDisposition dispositionType)
 
 void WResource::setChanged()
 {
-  generateUrl();
+  if (!currentUrl_.empty())
+    generateUrl();
 
   dataChanged_.emit();
+}
+
+void WResource::setInvalidAfterChanged(bool enabled)
+{
+  invalidAfterChanged_ = enabled;
 }
 
 const std::string& WResource::url() const
@@ -334,6 +345,16 @@ void WResource::write(WT_BOSTREAM& out,
 void WResource::setTakesUpdateLock(bool enabled)
 {
   takesUpdateLock_ = enabled;
+}
+
+unsigned long WResource::version() const
+{
+  return version_;
+}
+
+void WResource::incrementVersion()
+{
+  version_++;
 }
 
 }

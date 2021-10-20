@@ -126,6 +126,8 @@ long benchmarkQuery(
   return std::chrono::duration_cast<std::chrono::seconds>(end - start).count();
 }
 
+BOOST_AUTO_TEST_SUITE( DBO_TEST_SUITE_NAME )
+
 BOOST_AUTO_TEST_CASE( performance_test2 )
 {
   DboBenchmark2Fixture f;
@@ -158,7 +160,7 @@ BOOST_AUTO_TEST_CASE( performance_test2 )
               << std::endl;
 
     for (int i = 0; i < total_objects - current_objects; ++i) {
-      auto p = Wt::cpp14::make_unique<Perf2::Post>();
+      auto p = std::make_unique<Perf2::Post>();
       p->counter = 1;
       session.add(std::move(p));
     }
@@ -197,3 +199,5 @@ BOOST_AUTO_TEST_CASE( performance_test2 )
     std::cerr << std::endl;
   }
 }
+
+BOOST_AUTO_TEST_SUITE_END()

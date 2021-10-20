@@ -45,6 +45,7 @@ namespace Wt {
    *     i != allUsers.end(); ++i){
    *   dbo::ptr<User> user = *i;
    * }
+   * \endcode
    *
    * The container is read only when it reflects results of a query.
    * Otherwise, when involved in a Many-to-One or Many-to-Many
@@ -73,7 +74,7 @@ namespace Wt {
    * }
    * \endcode
    *
-   * If you cannot gaurantee that during its iteration the same query
+   * If you cannot guarantee that during its iteration the same query
    * will be reused, you should copy the results in a standard
    * container. Note that this is no big overhead since dbo pointers
    * are lightweight.
@@ -121,9 +122,16 @@ namespace Wt {
 
     /*! \brief Iterator.
      */
-    class iterator : public std::iterator<std::input_iterator_tag, C>
+    class iterator
     {
     public:
+
+      typedef std::input_iterator_tag iterator_category;
+      typedef                       C value_type;
+      typedef          std::ptrdiff_t difference_type;
+      typedef             value_type *pointer;
+      typedef             value_type& reference;
+
       /*! \brief Copy constructor.
        */
       iterator(const iterator& other);
@@ -194,9 +202,16 @@ namespace Wt {
 
     /*! \brief Const Iterator.
      */
-    class const_iterator : public std::iterator<std::input_iterator_tag, C>
+    class const_iterator
     {
     public:
+
+      typedef std::input_iterator_tag iterator_category;
+      typedef                       C value_type;
+      typedef          std::ptrdiff_t difference_type;
+      typedef             value_type *pointer;
+      typedef             value_type& reference;
+
       /*! \brief Copy constructor.
        */
       const_iterator(const const_iterator& other);

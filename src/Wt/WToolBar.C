@@ -10,6 +10,10 @@
 #include "Wt/WSplitButton.h"
 #include "Wt/WToolBar.h"
 
+#include "web/WebUtils.h"
+
+#include <algorithm>
+
 namespace Wt {
 
 LOGGER("WToolBar");
@@ -34,6 +38,8 @@ void WToolBar::setOrientation(Orientation orientation)
 void WToolBar::addButton(std::unique_ptr<WPushButton> button,
 			 AlignmentFlag alignmentFlag)
 {
+  widgets_.push_back(button.get());
+
   if (compact_){
     if (alignmentFlag == AlignmentFlag::Right)
       button->setAttributeValue("style", "float:right;");
@@ -48,6 +54,8 @@ void WToolBar::addButton(std::unique_ptr<WPushButton> button,
 void WToolBar::addButton(std::unique_ptr<WSplitButton> button,
 			 AlignmentFlag alignmentFlag)
 {
+  widgets_.push_back(button.get());
+
   setCompact(false);
   lastGroup_ = nullptr;
   if (alignmentFlag == AlignmentFlag::Right)
@@ -58,6 +66,8 @@ void WToolBar::addButton(std::unique_ptr<WSplitButton> button,
 void WToolBar::addWidget(std::unique_ptr<WWidget> widget,
 			 AlignmentFlag alignmentFlag)
 {
+  widgets_.push_back(widget.get());
+
   setCompact(false);
   lastGroup_ = nullptr;
   if (alignmentFlag == AlignmentFlag::Right)
@@ -67,23 +77,18 @@ void WToolBar::addWidget(std::unique_ptr<WWidget> widget,
 
 std::unique_ptr<WWidget> WToolBar::removeWidget(WWidget *widget)
 {
-  WWidget *p = widget->parent();
-  if (p == impl_)
-    return impl_->removeWidget(widget);
-  else {
-    int i = impl_->indexOf(p);
-    if (i >= 0) {
-      WContainerWidget *cw = dynamic_cast<WContainerWidget *>(p);
-      if (cw) {
-	std::unique_ptr<WWidget> result = cw->removeWidget(widget);
-	if (cw->count() == 0)
-	  cw->parent()->removeWidget(cw);
-	return result;
-      }
-    }
-  }
+  auto idx = Utils::indexOf(widgets_, widget);
+  if (idx != -1) {
+    auto parent = static_cast<WContainerWidget*>(widget->parent());
 
-  return std::unique_ptr<WWidget>();
+    auto retval = parent->removeWidget(widget);
+    if (parent != impl_  && parent->count() == 0)
+      impl_->removeWidget(parent);
+    widgets_.erase(widgets_.begin() + idx);
+
+    return retval;
+  } else
+    return nullptr;
 }
 
 void WToolBar::addSeparator()
@@ -120,7 +125,7 @@ void WToolBar::setCompact(bool compact)
 WContainerWidget *WToolBar::lastGroup()
 {
   if (!lastGroup_) {
-    lastGroup_ = impl_->addWidget(cpp14::make_unique<WContainerWidget>());
+    lastGroup_ = impl_->addWidget(std::make_unique<WContainerWidget>());
     lastGroup_->addStyleClass("btn-group");
   }
 
@@ -129,51 +134,15 @@ WContainerWidget *WToolBar::lastGroup()
 
 int WToolBar::count() const
 {
-  if (compact_)
-    return impl_->count();
-  else {
-    int result = 0;
-    for (int i = 0; i < impl_->count(); ++i) {
-      WWidget *w = impl_->widget(i);
-
-      if (dynamic_cast<WSplitButton *>(w))
-	++result;
-      else {
-	WContainerWidget *group = dynamic_cast<WContainerWidget *>(w);
-
-	result += group->count();
-      }
-    }
-
-    return result;
-  }
+  return widgets_.size();
 }
 
 WWidget *WToolBar::widget(int index) const
 {
-  if (compact_)
-    return impl_->widget(index);
-  else {
-    int current = 0;
-    for (int i = 0; i < impl_->count(); ++i) {
-      WWidget *w = impl_->widget(i);
-
-      if (dynamic_cast<WSplitButton *>(w)) {
-	if (index == current)
-	  return w;
-	++current;
-      } else {
-	WContainerWidget *group = dynamic_cast<WContainerWidget *>(w);
-
-	if (index < current + group->count())
-	  return group->widget(index - current);
-
-	current += group->count();
-      }
-    }
-
+  if (index < widgets_.size())
+    return widgets_[index];
+  else
     return nullptr;
-  }
 }
 
 }

@@ -17,8 +17,8 @@ LOGGER("Auth.OidcService");
 
   namespace Auth {
 
-  OidcProcess::OidcProcess(const OidcService& service, const std::string& scope)
-    : OAuthProcess(service, scope)
+    OidcProcess::OidcProcess(const OidcService& service, const std::string& scope)
+      : OAuthProcess(service, scope)
   { }
 
   void OidcProcess::getIdentity(const OAuthAccessToken& token)
@@ -45,7 +45,11 @@ LOGGER("Auth.OidcService");
     httpClient_->get(service().userInfoEndpoint(), headers);
 
 #ifndef WT_TARGET_JAVA
-    WApplication::instance()->deferRendering();
+    // Gives warning when not using popup since it's not called from the event
+    // loop. However, the application is currently suspended and will entirely
+    // rerender, so this will also work.
+    WApplication::UpdateLock lock(WApplication::instance());
+    WApplication::instance()->enableUpdates(true);
 #endif
   }
 
@@ -62,7 +66,7 @@ LOGGER("Auth.OidcService");
   void OidcProcess::handleResponse(AsioWrapper::error_code err, const Http::Message& response)
   {
 #ifndef WT_TARGET_JAVA
-    WApplication::instance()->resumeRendering();
+    WApplication::UpdateLock lock(WApplication::instance());
 #endif
 
     if (!err && response.status() == 200) {
@@ -99,6 +103,9 @@ LOGGER("Auth.OidcService");
 
       authenticated().emit(Identity::Invalid);
     }
+
+    WApplication::instance()->triggerUpdate();
+    WApplication::instance()->enableUpdates(false);
   }
 
 Identity OidcProcess::parseIdToken(const std::string& idToken)
@@ -156,7 +163,7 @@ std::unique_ptr<OAuthProcess> OidcService::createProcess(const std::string& scop
   if (configured_)
     return std::unique_ptr<OAuthProcess>(new OidcProcess(*this, scope));
   else
-    throw new WException("OidcService not configured correctly");
+    throw WException("OidcService not configured correctly");
 }
 
 void OidcService::setRedirectEndpoint(const std::string& url)

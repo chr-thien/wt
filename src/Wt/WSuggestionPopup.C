@@ -65,6 +65,7 @@ WSuggestionPopup::WSuggestionPopup(const Options& options)
     filtering_(false),
     defaultValue_(-1),
     isDropDownIconUnfiltered_(false),
+    isAutoSelectEnabled_(true),
     currentItem_(-1),
     editRole_(ItemDataRole::User),
     matcherJS_(generateMatcherJS(options)),
@@ -83,6 +84,7 @@ WSuggestionPopup::WSuggestionPopup(const std::string& matcherJS,
     filtering_(false),
     defaultValue_(-1),
     isDropDownIconUnfiltered_(false),
+    isAutoSelectEnabled_(true),
     currentItem_(-1),
     editRole_(ItemDataRole::User),
     matcherJS_(matcherJS),
@@ -123,6 +125,7 @@ void WSuggestionPopup::defineJavaScript()
   LOAD_JAVASCRIPT(app, THIS_JS, "WSuggestionPopupStdMatcher", wtjs2);
 
   std::string ddUnfiltered = isDropDownIconUnfiltered_ ? "true" : "false";
+  std::string autoSelect = isAutoSelectEnabled_ ? "true" : "false";
   setJavaScriptMember(" WSuggestionPopup",
 		      "new " WT_CLASS ".WSuggestionPopup("
 		      + app->javaScriptClass() + "," + jsRef() + ","
@@ -130,7 +133,8 @@ void WSuggestionPopup::defineJavaScript()
 		      + std::to_string(std::max(0, filterLength_)) + ","
 		      + std::to_string(partialResults()) + ","
                       + std::to_string(defaultValue_) + ","
-                      + ddUnfiltered + ");");
+                      + ddUnfiltered + ","
+		      + autoSelect + ");");
 }
 
 void WSuggestionPopup::render(WFlags<RenderFlag> flags)
@@ -215,7 +219,7 @@ void WSuggestionPopup::modelRowsInserted(const WModelIndex& parent,
     return;
 
   for (int i = start; i <= end; ++i) {
-    WContainerWidget *line = impl_->insertWidget(i, cpp14::make_unique<WContainerWidget>());
+    WContainerWidget *line = impl_->insertWidget(i, std::make_unique<WContainerWidget>());
 
     WModelIndex index = model_->index(i, modelColumn_);
 
@@ -223,8 +227,8 @@ void WSuggestionPopup::modelRowsInserted(const WModelIndex& parent,
 
     TextFormat format = index.flags().test(ItemFlag::XHTMLText) ? 
       TextFormat::XHTML : TextFormat::Plain;
-    WAnchor *anchor = line->addWidget(cpp14::make_unique<WAnchor>());
-    WText *value = anchor->addWidget(cpp14::make_unique<WText>(asString(d), format));
+    WAnchor *anchor = line->addWidget(std::make_unique<WAnchor>());
+    WText *value = anchor->addWidget(std::make_unique<WText>(asString(d), format));
 
     cpp17::any d2 = index.data(editRole_);
     if (!cpp17::any_has_value(d2))
@@ -314,6 +318,11 @@ void WSuggestionPopup::forEdit(WFormWidget *edit, WFlags<PopupTrigger> triggers)
 void WSuggestionPopup::setDropDownIconUnfiltered(bool isUnfiltered)
 {
   isDropDownIconUnfiltered_ = isUnfiltered;
+}
+
+void WSuggestionPopup::setAutoSelectEnabled(bool enabled)
+{
+  isAutoSelectEnabled_ = enabled;
 }
 
 void WSuggestionPopup::showAt(WFormWidget *edit)

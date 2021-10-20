@@ -84,8 +84,7 @@ void WebSocketMessage::setContentLength(::int64_t length)
 void WebSocketMessage::addHeader(const std::string& name,
 				 const std::string& value)
 {
-  if (name == "Set-Cookie")
-    out() << "document.cookie=" << WWebWidget::jsStringLiteral(value) << ";";
+  error("addHeader(): not supported");
 }
 
 const char *WebSocketMessage::envValue(const char *name) const
@@ -151,9 +150,9 @@ const char *WebSocketMessage::urlScheme() const
     return "http";
 }
 
-std::unique_ptr<Wt::WSslInfo> WebSocketMessage::sslInfo(bool behindReverseProxy) const
+std::unique_ptr<Wt::WSslInfo> WebSocketMessage::sslInfo(const Configuration & conf) const
 {
-  return webSocket()->sslInfo(behindReverseProxy);
+  return webSocket()->sslInfo(conf);
 }
 
 const char *WebSocketMessage::headerValue(const char *name) const

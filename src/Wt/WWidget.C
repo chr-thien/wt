@@ -360,8 +360,6 @@ void WWidget::dropEvent(WDropEvent event)
 
 DomElement *WWidget::createSDomElement(WApplication *app)
 {
-  if (!loaded())
-    load();
   if (!needsToBeRendered()) {
     DomElement *result = webWidget()->createStubElement(app);
     renderOk();
@@ -513,4 +511,15 @@ void WWidget::addJSignal(EventSignalBase* signal)
 {
   jsignals_.push_back(signal);
 }
+
+bool WWidget::isGlobalWidget() const
+{
+  return flags_.test(BIT_GLOBAL_WIDGET);
+}
+
+void WWidget::setGlobalWidget(bool globalWidget)
+{
+  flags_.set(BIT_GLOBAL_WIDGET, globalWidget);
+}
+
 }

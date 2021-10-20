@@ -133,8 +133,8 @@ enum class PopupTrigger {
  *     ", "           // appendReplacedText (prepare next email address)
  *    };
  *
- * Wt::WSuggestionPopup *popup = addWidget(std::make_unique<Wt::WSuggestionPopup>(contactOptions));
- * Wt::WTextArea *textEdit = addWidget(std::make_unique<Wt::WTextArea>());
+ * Wt::WSuggestionPopup *popup = addNew<Wt::WSuggestionPopup>(contactOptions);
+ * Wt::WTextArea *textEdit = addNew<Wt::WTextArea>();
  * popup->forEdit(textEdit);
  *
  * // load popup data
@@ -162,6 +162,14 @@ enum class PopupTrigger {
  * popup.addSuggestion(contacts.get(i).formatted(), contacts.get(i).formatted());
  * \endcode
  * \endif
+ *
+ * \note This widget is not supposed to be added explicitly, as it is a global widget
+ * (much like WPopupWidget). Managing its lifetime can be achieved with
+ * WContainerWidget::addNew() or WObject::addChild(), where the former uses the latter.
+ * Do NOT bind it to a template using WTemplate::bindWidget(), WTemplate::bindNew() or
+ * WLayout::addWidget(). If bound this way, the placeholder is not replaced with the
+ * correct list of suggestions, since this causes the widget to be placed into the widget
+ * tree twice.
  *
  * A screenshot of this example:
  * <TABLE border="0" align="center"> <TR> <TD> 
@@ -451,6 +459,13 @@ public:
    */
   void setDropDownIconUnfiltered(bool isUnfiltered);
 
+  /*! \brief When the popup is opened the first item is automatically selected.
+   *
+   * This cannot be changed after the widget is rendered. The default value is
+   * true.
+   */
+  void setAutoSelectEnabled(bool enabled);
+
   /*! \brief Returns the last activated index
    * 
    * Returns -1 if the popup hasn't been activated yet.
@@ -479,6 +494,7 @@ private:
   bool filtering_;
   int defaultValue_;
   bool isDropDownIconUnfiltered_;
+  bool isAutoSelectEnabled_;
   int currentItem_;
   ItemDataRole editRole_;
 

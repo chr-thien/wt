@@ -149,25 +149,36 @@ struct DboFixture : DboFixtureBase
   DboFixture() :
     DboFixtureBase()
   {
-    session_->mapClass<A>(SCHEMA "table_a");
-    session_->mapClass<B>(SCHEMA "table_b");
-    session_->mapClass<C>(SCHEMA "table_c");
-    session_->mapClass<D>(SCHEMA "table_d");
-    session_->mapClass<E>(SCHEMA "table_e");
-    session_->mapClass<F>(SCHEMA "table_f");
+    initSession(session_);
+    Wt::registerType<Coordinate>();
+  }
+
+  std::unique_ptr<dbo::Session> createSession() {
+    auto session = std::make_unique<dbo::Session>();
+    session->setConnectionPool(*connectionPool_);
+    initSession(session.get());
+
+    return session;
+  }
+
+  void initSession(dbo::Session *session) {
+    session->mapClass<A>(SCHEMA "table_a");
+    session->mapClass<B>(SCHEMA "table_b");
+    session->mapClass<C>(SCHEMA "table_c");
+    session->mapClass<D>(SCHEMA "table_d");
+    session->mapClass<E>(SCHEMA "table_e");
+    session->mapClass<F>(SCHEMA "table_f");
 
     try {
-      session_->dropTables();
+      session->dropTables();
     } catch (...) {
     }
 
-    std::cerr << session_->tableCreationSql() << std::endl;
+    std::cerr << session->tableCreationSql() << std::endl;
 
-    //session_->dropTables();
+    //session->dropTables();
 
-    session_->createTables();
-
-    Wt::registerType<Coordinate>();
+    session->createTables();
   }
 };
 
@@ -595,6 +606,8 @@ public:
     dbo::field(a, gender,  "gender",  64);
   }
 };
+
+BOOST_AUTO_TEST_SUITE( DBO_TEST_SUITE_NAME )
 
 BOOST_AUTO_TEST_CASE( dbo_test1 )
 {
@@ -2183,7 +2196,7 @@ BOOST_AUTO_TEST_CASE( dbo_test23a )
   {
     dbo::Transaction t(*session_);
 
-    auto a1 = Wt::cpp14::make_unique<A>();
+    auto a1 = std::make_unique<A>();
     a1->ll = 123456L;
     dbo::ptr<const A> aPtr(std::move(a1));
 
@@ -2216,11 +2229,11 @@ BOOST_AUTO_TEST_CASE( dbo_test23b )
   {
     dbo::Transaction t(*session_);
 
-    auto a1 = Wt::cpp14::make_unique<A>();
+    auto a1 = std::make_unique<A>();
     a1->ll = 123456L;
     dbo::ptr<A> aPtr1(std::move(a1));
 
-    auto c1 = Wt::cpp14::make_unique<C>();
+    auto c1 = std::make_unique<C>();
     c1->name = "Jos";
     dbo::ptr<C> cPtr1(std::move(c1));
 
@@ -2264,7 +2277,7 @@ BOOST_AUTO_TEST_CASE( dbo_test23c )
   {
     dbo::Transaction t(*session_);
 
-    auto d = Wt::cpp14::make_unique<D>();
+    auto d = std::make_unique<D>();
     d->id = Coordinate(2, 4);
 
     dbo::ptr<D> dPtr = session_->add(std::move(d));
@@ -3294,3 +3307,58 @@ BOOST_AUTO_TEST_CASE( dbo_test42 )
   }
 #endif // POSTGRES
 }
+
+BOOST_AUTO_TEST_CASE( dbo_test43 )
+{
+  // Test for collection iterator's operator== for pull request #177
+  // This will crash without that patch
+  DboFixture f;
+  dbo::Session &session = *f.session_;
+
+  {
+    dbo::Transaction t(session);
+    dbo::ptr<B> b1 = session.addNew<B>();
+    b1.modify()->name = "Test1";
+    dbo::ptr<B> b2 = session.addNew<B>();
+    b2.modify()->name = "Test2";
+  }
+
+  {
+    dbo::Transaction t(session);
+
+    dbo::collection<dbo::ptr<B>> collection = session.find<B>().resultList();
+
+    auto begin = collection.begin();
+    auto end = collection.end();
+
+    BOOST_REQUIRE(begin == begin);
+    BOOST_REQUIRE(!(begin != begin));
+    BOOST_REQUIRE(end == end);
+    BOOST_REQUIRE(!(end != end));
+    BOOST_REQUIRE(!(begin == end));
+    BOOST_REQUIRE(begin != end);
+    BOOST_REQUIRE(!(end == begin));
+    BOOST_REQUIRE(end != begin);
+  }
+}
+
+BOOST_AUTO_TEST_CASE( dbo_test44 )
+{
+  // #8518: memory corruption when Session is deleted with dirty objects
+  // Run as: valgrind --exit-on-first-error=yes --error-exitcode=1 ...
+  DboFixture f;
+  dbo::ptr<A> a;
+  {
+    // Creating new session since DboFixture will dropTables() before
+    // deleting session.
+    auto session = f.createSession();
+    {
+      dbo::Transaction t(*session);
+      a = session->addNew<A>();
+    }
+
+    a.modify();
+  }
+}
+
+BOOST_AUTO_TEST_SUITE_END()

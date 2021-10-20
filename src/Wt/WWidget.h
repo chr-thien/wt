@@ -751,7 +751,7 @@ public:
    *
    * The widget must actualize its contents in response.
    *
-   * \note This does *not* rerender the widget! Calling refresh() usually
+   * \note This does **not** rerender the widget! Calling refresh() usually
    *       does not have any effect (unless you've reimplemented refresh()
    *       to attach to it an effect).
    */
@@ -825,9 +825,8 @@ public:
 
   /*! \brief Loads content just before the widget is used.
    *
-   * This method is called after a widget is inserted in the widget
-   * hierarchy and fully constructed, but before the widget is rendered.
-   * Widgets that get inserted in the widget hierarchy will
+   * This function is called when a widget is inserted in the
+   * widget hierarchy. Widgets that get inserted in the widget hierarchy will
    * be rendered. Visible widgets are rendered immediately, and
    * invisible widgets in the back-ground (or not for a plain HTML
    * session). This method is called when the widget is directly or
@@ -946,6 +945,13 @@ public:
    * \note An id must start with a letter ([A-Za-z]), followed by one or more
    * letters, digits ([0-9]), hyphens ("-"), underscores ("_"), colons (":"),
    * and periods (".").
+   *
+   * \warning We recommend that you leave the id of a widget unchanged. %Wt
+   * uses the id to identify widgets in the JavaScript it generates,
+   * and this can often leads to bugs. If you do change the id, **only** change
+   * the id right after widget construction. However, usually
+   * there's a more preferable alternative, like setting the object name
+   * (WObject::setObjectName), or adding style classes (WWidget::addStyleClass).
    *
    * \sa WObject::id()
    */
@@ -1073,7 +1079,7 @@ public:
    *
    * This feature can be useful to implement infinite scroll, where a sentinel widget
    * placed at the bottom of the page causes more content to be loaded when it
-   * becomes visible, see the <tt>infinite-scroll</tt> example.
+   * becomes visible, see the <tt>scrollvisibility</tt> example.
    *
    * This feature can also be used to lazy load widgets when they become visible.
    *
@@ -1345,6 +1351,10 @@ protected:
 			   const std::string& declarations,
 			   const std::string& ruleName = std::string());
 
+  bool isGlobalWidget() const;
+
+  virtual std::string renderRemoveJs(bool recursive) = 0;
+
 private:
   /*
    * Booleans packed in a bitset.
@@ -1356,7 +1366,8 @@ private:
   static const int BIT_HAS_PARENT = 4;
   static const int BIT_RESIZE_AWARE = 5;
   static const int BIT_SCROLL_VISIBILITY_ENABLED = 6;
-  std::bitset<7> flags_;
+  static const int BIT_GLOBAL_WIDGET = 7;
+  std::bitset<8> flags_;
 
   EventSignalList eventSignals_;
   std::vector<EventSignalBase*> jsignals_;
@@ -1366,6 +1377,8 @@ private:
   void undoHideShow();
   void undoDisableEnable();
   virtual void setParentWidget(WWidget *parent);
+
+  void setGlobalWidget(bool globalWidget);
 
   virtual WWebWidget *webWidget() = 0;
 

@@ -225,8 +225,16 @@ std::string Request::clientAddress() const
     return std::string();
 
   WServer *server = WServer::instance();
-  const bool behindReverseProxy = server && server->configuration().behindReverseProxy();
-  return request_->clientAddress(behindReverseProxy);
+  return request_->clientAddress(server->configuration());
+}
+
+std::string Request::hostName() const
+{
+  if (!request_)
+    return std::string();
+
+  WServer *server = WServer::instance();
+  return request_->hostName(server->configuration());
 }
 
 WSslInfo *Request::sslInfo() const
@@ -235,8 +243,7 @@ WSslInfo *Request::sslInfo() const
     return sslInfo_.get();
   if (request_) {
     auto server = WServer::instance();
-    bool behindReverseProxy = server && server->configuration().behindReverseProxy();
-    sslInfo_ = request_->sslInfo(behindReverseProxy);
+    sslInfo_ = request_->sslInfo(server->configuration());
   }
   return sslInfo_.get();
 }
@@ -388,6 +395,12 @@ void Request::parseFormUrlEncoded(const std::string& s,
 {
   for (std::size_t pos = 0; pos < s.length();) {
     std::size_t next = s.find_first_of("&=", pos);
+
+    if (next == pos && s[next] == '&') {
+      // skip empty
+      pos = next + 1;
+      continue;
+    }
 
     if (next == std::string::npos || s[next] == '&') {
       if (next == std::string::npos)

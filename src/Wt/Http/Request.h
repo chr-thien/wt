@@ -277,6 +277,10 @@ public:
    */
   std::string path() const;
 
+#ifdef WT_TARGET_JAVA
+  std::string requestURI() const;
+#endif // WT_TARGET_JAVA
+
   /*! \brief Returns the request path info.
    *
    * Returns additional path information internal to the path().
@@ -333,6 +337,14 @@ public:
    * the remote socket IP address is used. 
    */
   std::string clientAddress() const;
+
+  /*! \brief Returns the host name used in the request.
+   *
+   * This returns the value of the Host header, or if behind a
+   * trusted reverse proxy, the value of the X-Forwarded-Host header
+   * if it is present.
+   */
+  std::string hostName() const;
 
   /*! \brief Returns the cookies.
    *

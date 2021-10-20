@@ -14,6 +14,26 @@
 #include <exception>
 #include <chrono>
 
+#ifdef WT_DATE_TZ_USE_DATE
+namespace date {
+  class time_zone;
+}
+
+namespace Wt {
+namespace cpp20 {
+
+namespace date = ::date;
+
+}
+}
+#else
+namespace Wt::cpp20 {
+
+namespace date = std::chrono;
+
+}
+#endif
+
 namespace Wt {
 
 /*! \class WLocalDateTime Wt/WLocalDateTime.h Wt/WLocalDateTime.h
@@ -124,6 +144,8 @@ public:
    *
    * This returns the time zone offset to UTC in minutes. A positive value
    * thus means that the local time is ahead of UTC.
+   *
+   * \throws WException if this object was initialized without timezone information
    */
   int timeZoneOffset() const;
 
@@ -131,7 +153,7 @@ public:
    *
    * \sa WLocale::setTimeZone()
    */
-  const date::time_zone *timeZone() const;
+  const cpp20::date::time_zone *timeZone() const;
 
   /*! \brief Converts to UTC.
    *
@@ -194,12 +216,12 @@ private:
 
   std::chrono::system_clock::time_point datetime_; // UTC clock
   WT_USTRING format_;
-  const date::time_zone *zone_;
+  const cpp20::date::time_zone *zone_;
   std::shared_ptr<OffsetZone> customZone_;
   bool valid_, null_;
 
   WLocalDateTime(const std::chrono::system_clock::time_point& dt,
-                 const date::time_zone *zone, const WT_USTRING& format);
+                 const cpp20::date::time_zone *zone, const WT_USTRING& format);
   WLocalDateTime(const std::chrono::system_clock::time_point& dt,
                  const std::shared_ptr<OffsetZone>& zone, const WT_USTRING& format);
 

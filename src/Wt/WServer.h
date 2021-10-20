@@ -552,6 +552,8 @@ public:
    */
   WTCONNECTOR_API std::vector<SessionInfo> sessions() const;
 
+  void updateProcessSessionId(const std::string& sessionId);
+
   /*! \brief Returns the logger instance.
    *
    * This is the logger class used in WApplication::log() and
@@ -559,7 +561,6 @@ public:
    */
   WT_API WLogger& logger();
 
-#ifndef WT_TARGET_JAVA
   /*! \brief Sets a custom logger to redirect all logging to.
    *
    * Instead of using the server's default logger, this will send
@@ -568,7 +569,6 @@ public:
   WT_API void setCustomLogger(const WLogSink &customLogger);
 
   const WLogSink * customLogger() const;
-#endif // WT_TARGET_JAVA
 
   /*! \brief Adds an entry to the log.
    *
@@ -579,8 +579,11 @@ public:
   WT_API void initLogger(const std::string& logFile,
 			 const std::string& logConfig);
 
-  /*!
-   * \brief Reflects whether the current process is a dedicated session process
+  /*! \brief Reflects whether the current process is a dedicated session process
+   *
+   * \note This will only be accurate after the WServer has been configured, either
+   *       through setServerConfiguration() or one of the constructors that immediately
+   *       configures the server.
    */
   WT_API bool dedicatedSessionProcess() const;
 #endif // WT_TARGET_JAVA
@@ -643,6 +646,7 @@ private:
   std::function<std::string (std::size_t max_length, int purpose)> sslPasswordCallback_;
 #ifndef WT_TARGET_JAVA
   std::function<void ()> stopCallback_;
+  std::function<void (const std::string& sessionId)> updateProcessSessionIdCallback_;
 #endif // WT_TARGET_JAVA
 };
 

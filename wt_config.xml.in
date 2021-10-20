@@ -258,6 +258,17 @@
 	-->
 	<max-formdata-size>5120</max-formdata-size>
 
+        <!--- Maximum number of pending events
+            
+            Client-side events (user-interaction, WTimer, custom js signals) are
+            queued if the server did not yet respond to a previous update.
+            This allows you to configure the maximum number of events in the queue.
+            When the maximum is exceeded, the session stops and an error is logged
+            in the server.
+            Setting it to zero will disable the limit.
+        -->
+        <max-pending-events>1000</max-pending-events>
+
         <!-- Number of threads per process
 
            You may want to change this value if you would like to
@@ -401,8 +412,53 @@
 
            This option is required to make e.g. clientAddress() return the
            correct address.
+
+           Deprecated: use trusted-proxy-config instead. If this option is
+           set to true, Wt will take the first non-local IP address from the
+           Client-IP and X-Forwarded-For headers to determine the clientAddress().
 	  -->
-	<behind-reverse-proxy>false</behind-reverse-proxy>
+        <!--<behind-reverse-proxy>false</behind-reverse-proxy>-->
+
+        <!-- The following configuration options can be used when Wt is behind a reverse proxy.
+          -->
+        <trusted-proxy-config>
+          <!-- Which header to use to get the real client IP address when behind a reverse proxy.
+
+               This could be X-Forwarded-For (default), CF-Connecting-IP for Cloudflare,
+               True-Client-IP, Fastly-Client-IP,...
+
+               This will influence the IP address returned by WEnvironment::clientAddress() and
+               Http::Request::clientAddress().
+            -->
+          <original-ip-header>X-Forwarded-For</original-ip-header>
+
+          <!-- Which proxy servers are trusted
+
+               You can use single IP addresses or subnets in CIDR notation.
+
+               By default, no proxy servers are trusted and any proxy headers are ignored, e.g.
+               X-Forwarded-For, X-Forwarded-Proto, etc.
+            -->
+          <trusted-proxies>
+            <!-- loopback -->
+            <!--
+            <proxy>127.0.0.1/8</proxy>
+            <proxy>::1/128</proxy>
+            -->
+            <!-- link local -->
+            <!--
+            <proxy>169.254.0.0/16</proxy>
+            <proxy>fe80::/10</proxy>
+            -->
+            <!-- local -->
+            <!--
+            <proxy>10.0.0.0/8</proxy>
+            <proxy>172.16.0.0/12</proxy>
+            <proxy>192.168.0.0/16</proxy>
+            <proxy>fc00::/7</proxy>
+            -->
+          </trusted-proxies>
+        </trusted-proxy-config>
 
 	<!-- Whether inline CSS is allowed.
 
@@ -710,8 +766,12 @@
                               this is randomly generated, which is sufficient for single-process
                               deployments, but for multi-process deployments the same value must
                               be used in all processes and thus needs to be pre-configured.
+             - oauth2-redirect-timeout: a timeout (in seconds) for when single-sign-on is used
+                                        without popup. If a user takes longer than this to login,
+                                        the application will be destroyed. The default is 10 minutes.
             -->
             <!-- <property name="oauth2-secret"></property> -->
+            <!-- <property name="oauth2-redirect-timeout">600</property> -->
 
             <!-- PayPal properties
 

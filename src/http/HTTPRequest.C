@@ -261,10 +261,11 @@ bool HTTPRequest::isSynchronous() const
   return false;
 }
 
-std::unique_ptr<Wt::WSslInfo> HTTPRequest::sslInfo(bool behindReverseProxy) const
+std::unique_ptr<Wt::WSslInfo> HTTPRequest::sslInfo(const Wt::Configuration &conf) const
 {
   auto result = reply_->request().sslInfo();
-  if (behindReverseProxy) {
+  if (conf.behindReverseProxy() ||
+      conf.isTrustedProxy(remoteAddr())) {
 #ifdef HTTP_WITH_SSL
     if (!result)
       result = sslInfoFromJson();
@@ -309,7 +310,7 @@ std::unique_ptr<Wt::WSslInfo> HTTPRequest::sslInfoFromJson() const
     Wt::ValidationState state = static_cast<Wt::ValidationState>(static_cast<int>(obj["client-verification-result-state"]));
     Wt::WString message = obj["client-verification-result-message"];
 
-    return Wt::cpp14::make_unique<Wt::WSslInfo>(clientCert,
+    return std::make_unique<Wt::WSslInfo>(clientCert,
                                                 clientCertChain,
                                                 Wt::WValidator::Result(state, message));
   }
@@ -382,7 +383,7 @@ std::unique_ptr<Wt::WSslInfo> HTTPRequest::sslInfoFromHeaders() const
 
     if (cert) {
       Wt::WSslCertificate clientCert = Wt::Ssl::x509ToWSslCertificate(cert);
-      return Wt::cpp14::make_unique<Wt::WSslInfo>(clientCert,
+      return std::make_unique<Wt::WSslInfo>(clientCert,
                                                   std::vector<Wt::WSslCertificate>(),
                                                   Wt::WValidator::Result(v == SUCCESS ? Wt::ValidationState::Valid : Wt::ValidationState::Invalid,
                                                                          failedReason ? Wt::utf8(failedReason) : Wt::WString::Empty));
@@ -410,7 +411,7 @@ std::unique_ptr<Wt::WSslInfo> HTTPRequest::sslInfoFromHeaders() const
                                    validityStart,
                                    validityEnd,
                                    clientCertStr);
-    return Wt::cpp14::make_unique<Wt::WSslInfo>(clientCert,
+    return std::make_unique<Wt::WSslInfo>(clientCert,
                                                 std::vector<Wt::WSslCertificate>(),
                                                 Wt::WValidator::Result(v == SUCCESS ? Wt::ValidationState::Valid : Wt::ValidationState::Invalid,
                                                                        failedReason ? Wt::utf8(failedReason) : Wt::WString::Empty));

@@ -304,7 +304,7 @@ std::string WWebWidget::renderRemoveJs(bool recursive)
 
   iterateChildren
     ([&](WWidget *c) {
-      result << c->webWidget()->renderRemoveJs(true);
+      result << c->renderRemoveJs(true);
     });
 
   if (!recursive) {
@@ -320,7 +320,7 @@ std::string WWebWidget::renderRemoveJs(bool recursive)
 void WWebWidget::widgetRemoved(WWidget *child, bool renderRemove)
 {
   if (!flags_.test(BIT_BEING_DELETED) && renderRemove) {
-    std::string js = child->webWidget()->renderRemoveJs(false);
+    std::string js = child->renderRemoveJs(false);
 
     if (!transientImpl_)
       transientImpl_.reset(new TransientImpl());
@@ -1196,6 +1196,10 @@ bool WWebWidget::isEnabled() const
 void WWebWidget::widgetAdded(WWidget *child)
 {
   child->setParentWidget(this);
+
+  if (flags_.test(BIT_LOADED)) {
+    doLoad(child);
+  }
 
   WApplication::instance()
     ->session()->renderer().updateFormObjects(this, false);
@@ -2715,8 +2719,9 @@ bool WWebWidget::scrollVisibilityEnabled() const
 
 void WWebWidget::setScrollVisibilityEnabled(bool enabled)
 {
-  if (enabled && !otherImpl_) {
-    otherImpl_.reset(new OtherImpl(this));
+  if (enabled) {
+    if (!otherImpl_)
+      otherImpl_.reset(new OtherImpl(this));
     if (!otherImpl_->jsScrollVisibilityChanged_) {
       otherImpl_->jsScrollVisibilityChanged_.reset(new JSignal<bool>(this, "scrollVisibilityChanged"));
       otherImpl_->jsScrollVisibilityChanged_->connect(this, &WWebWidget::jsScrollVisibilityChanged);

@@ -86,22 +86,11 @@ const std::string& WEnvironment::deploymentPath() const
 void WEnvironment::updateHostName(const WebRequest& request)
 {
   Configuration& conf = session_->controller()->configuration();
-  std::string oldHost = host_;
-  host_ = str(request.headerValue("Host"));
+  std::string newHost = request.hostName(conf);
 
-  if(conf.behindReverseProxy()) {
-	std::string forwardedHost = str(request.headerValue("X-Forwarded-Host"));
-
-	if (!forwardedHost.empty()) {
-	  std::string::size_type i = forwardedHost.rfind(',');
-	  if (i == std::string::npos)
-		host_ = forwardedHost;
-	  else
-		host_ = forwardedHost.substr(i+1);
-	}
-
+  if (!newHost.empty()) {
+    host_ = newHost;
   }
-  if(host_.size() == 0) host_ = oldHost;
 }
 
 void WEnvironment::updateUrlScheme(const WebRequest& request) 
@@ -109,19 +98,17 @@ void WEnvironment::updateUrlScheme(const WebRequest& request)
   urlScheme_       = str(request.urlScheme());
 
   Configuration& conf = session_->controller()->configuration();
-#ifndef WT_TARGET_JAVA
-  if (conf.behindReverseProxy() || server()->dedicatedSessionProcess()) {
-#else
-  if (conf.behindReverseProxy()){
-#endif
-  std::string forwardedProto = str(request.headerValue("X-Forwarded-Proto"));
-  if (!forwardedProto.empty()) {
-	std::string::size_type i = forwardedProto.rfind(',');
-	if (i == std::string::npos)
-	  urlScheme_ = forwardedProto;
-	else
-	  urlScheme_ = forwardedProto.substr(i+1);
-  }
+
+  if (conf.behindReverseProxy() ||
+      conf.isTrustedProxy(request.remoteAddr())) {
+    std::string forwardedProto = str(request.headerValue("X-Forwarded-Proto"));
+    if (!forwardedProto.empty()) {
+      std::string::size_type i = forwardedProto.rfind(',');
+      if (i == std::string::npos)
+        urlScheme_ = forwardedProto;
+      else
+        urlScheme_ = forwardedProto.substr(i+1);
+    }
   }
 }
 
@@ -144,7 +131,7 @@ void WEnvironment::init(const WebRequest& request)
   if(!str(request.headerValue("Redirect-Secret")).empty())
 	session_->controller()->redirectSecret_ = str(request.headerValue("Redirect-Secret"));
 
-  sslInfo_ = request.sslInfo(conf.behindReverseProxy());
+  sslInfo_ = request.sslInfo(conf);
 #endif
 
   setUserAgent(str(request.headerValue("User-Agent")));
@@ -156,11 +143,8 @@ void WEnvironment::init(const WebRequest& request)
    * If behind a reverse proxy, use external host, schema as communicated using 'X-Forwarded'
    * headers.
    */
-#ifndef WT_TARGET_JAVA
-  if (conf.behindReverseProxy() || server()->dedicatedSessionProcess()) {
-#else
-	if (conf.behindReverseProxy()){
-#endif
+  if (conf.behindReverseProxy() ||
+      conf.isTrustedProxy(request.remoteAddr())) {
     std::string forwardedHost = str(request.headerValue("X-Forwarded-Host"));
 
     if (!forwardedHost.empty()) {
@@ -183,7 +167,7 @@ void WEnvironment::init(const WebRequest& request)
       host_ += ":" + request.serverPort();
   }
 
-  clientAddress_ = request.clientAddress(conf.behindReverseProxy());
+  clientAddress_ = request.clientAddress(conf);
 
   const char *cookie = request.headerValue("Cookie");
   doesCookies_ = cookie;

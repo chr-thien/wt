@@ -128,7 +128,7 @@ public:
   bool handleApplicationEvent(const std::shared_ptr<ApplicationEvent>& event);
 #endif // WT_CNOR
 
-  std::vector<std::string> sessions();
+  std::vector<std::string> sessions(bool onlyRendered = false);
   bool expireSessions();
   void start();
   void shutdown();
@@ -172,7 +172,7 @@ private:
 #ifdef WT_THREADED
   // mutex to protect access to the sessions map and plain/ajax session
   // counts
-  std::recursive_mutex mutex_;
+  mutable std::recursive_mutex mutex_;
 
   SocketNotifier socketNotifier_;
   // mutex to protect access to notifier maps. This cannot be protected
@@ -187,8 +187,15 @@ private:
   void socketNotify(int descriptor, WSocketNotifier::Type type);
 #endif
 
-  void updateResourceProgress(WebRequest *request,
-			      std::uintmax_t current, std::uintmax_t total);
+  struct UpdateResourceProgressParams {
+      std::string requestParam;
+      std::string resourceParam;
+      ::int64_t postDataExceeded;
+      std::string pathInfo;
+      std::uintmax_t current;
+      std::uintmax_t total;
+  };
+  void updateResourceProgress(const UpdateResourceProgressParams &params);
 
   EntryPointMatch getEntryPoint(WebRequest *request);
 

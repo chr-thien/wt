@@ -603,7 +603,7 @@ const char *IsapiRequest::urlScheme() const {
     return "http";
 }
 
-std::unique_ptr<WSslInfo> IsapiRequest::sslInfo(bool) const {
+std::unique_ptr<WSslInfo> IsapiRequest::sslInfo(const Configuration &) const {
 #ifdef WT_WITH_SSL
   CERT_CONTEXT_EX cce;
   memset(&cce, 0, sizeof(CERT_CONTEXT_EX));
@@ -632,7 +632,7 @@ std::unique_ptr<WSslInfo> IsapiRequest::sslInfo(bool) const {
           clientVerificationResult(invalid ? Wt::ValidationState::Invalid
 				   : Wt::ValidationState::Valid);
 
-        return cpp14::make_unique<Wt::WSslInfo>(clientCert,
+        return std::make_unique<Wt::WSslInfo>(clientCert,
                                                 clientCertChain,
                                                 clientVerificationResult);
       }

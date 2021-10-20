@@ -15,6 +15,7 @@
 #include "Configuration.h"
 #include "../web/Configuration.h"
 #include "WebController.h"
+#include "../web/WebUtils.h"
 
 #if !defined(WT_WIN32)
 #include <signal.h>
@@ -145,6 +146,8 @@ void WServer::setServerConfiguration(const std::string &applicationPath,
 
   impl_->serverConfiguration_->setOptions(applicationPath, args, serverConfigurationFile);
 
+  dedicatedProcessEnabled_ = impl_->serverConfiguration_->parentPort() != -1;
+
   configuration().setDefaultEntryPoint(impl_->serverConfiguration_
                                        ->deployPath());
 }
@@ -180,8 +183,15 @@ bool WServer::start()
     configuration().setNumThreads(impl_->serverConfiguration_->threads());
 
   if (impl_->serverConfiguration_->parentPort() != -1) {
-    configuration().setBehindReverseProxy(true);
-    dedicatedProcessEnabled_ = true;
+    configuration().setOriginalIPHeader("X-Forwarded-For");
+    auto trustedProxies = configuration().trustedProxies();
+    Utils::add(trustedProxies, Configuration::Network::fromString("127.0.0.1"));
+    Utils::add(trustedProxies, Configuration::Network::fromString("::1"));
+    configuration().setTrustedProxies(trustedProxies);
+    updateProcessSessionIdCallback_ = [this] (const std::string& sessionId)
+    {
+      impl_->server_->updateProcessSessionId(sessionId);
+    };
   }
 
   try {

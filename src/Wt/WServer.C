@@ -224,7 +224,7 @@ void WServer::postAll(const std::function<void ()>& function)
 {
   if(!webController_) return;
 
-  std::vector<std::string> sessions = webController_->sessions();
+  std::vector<std::string> sessions = webController_->sessions(true);
   for (std::vector<std::string>::const_iterator i = sessions.begin();
       i != sessions.end(); ++i) {
     schedule(std::chrono::milliseconds{0}, *i, function);
@@ -440,6 +440,11 @@ void WServer::scheduleStop()
   if (stopCallback_)
     stopCallback_();
 #endif // WT_THREADED
+}
+
+void WServer::updateProcessSessionId(const std::string& sessionId) {
+  if (updateProcessSessionIdCallback_)
+    updateProcessSessionIdCallback_(sessionId);
 }
 
 }
