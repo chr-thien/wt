@@ -29,8 +29,6 @@ class WT_API CgiParser
 public:
   enum ReadOption { ReadDefault, ReadHeadersOnly, ReadBodyAnyway };
 
-  static void init();
-
   CgiParser(::int64_t maxRequestSize, ::int64_t maxFormData);
 
   /*
@@ -42,7 +40,7 @@ public:
 
 private:
   void readMultipartData(WebRequest& request, const std::string type,
-			 ::int64_t len);
+                         ::int64_t len);
   bool parseBody(WebRequest& request, const std::string boundary);
   bool parseHead(WebRequest& request);
   ::int64_t maxFormData_, maxRequestSize_, left_;
@@ -52,9 +50,9 @@ private:
   std::string currentKey_;
 
   void readUntilBoundary(WebRequest& request, const std::string boundary,
-			 int tossAtBoundary,
-			 std::string *resultString,
-			 std::ostream *resultFile);
+                         int tossAtBoundary,
+                         std::string *resultString,
+                         std::ostream *resultFile);
   void windBuffer(int offset);
   int index(const std::string search);
 

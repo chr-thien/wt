@@ -34,19 +34,11 @@
   #endif
 #endif
 
+// Since Wt 4.5.0 we require C++14, so these are always defined
 #ifndef WT_CXX14
-
-#if __cplusplus >= 201402L || _MSVC_LANG >= 201402L
 #define WT_CXX14
-#endif
-
-#ifdef WT_CXX14
 #define WT_CXX14ONLY(x) x
-#else
-#define WT_CXX14ONLY(x)
 #endif
-
-#endif // end outer ifndef WT_CXX14
 
 #ifndef WT_CXX17
 
@@ -62,4 +54,23 @@
 
 #endif // end outer ifndef WT_CXX17
 
-#endif // DLLDEFS_H_
+#ifndef WT_DEPRECATED
+#if defined(WT_BUILDING) || defined(WT_CNOR)
+// Don't warn about internal use of deprecated APIs
+#define WT_DEPRECATED(details)
+#else
+#define WT_DEPRECATED(details) [[deprecated(details)]]
+#endif
+#endif
+
+#ifndef WT_FALLTHROUGH
+#if defined(WT_CXX17)
+#define WT_FALLTHROUGH [[fallthrough]];
+#elif defined(__GNUC__)
+#define WT_FALLTHROUGH __attribute__((fallthrough));
+#else
+#define WT_FALLTHROUGH
+#endif
+#endif
+
+#endif // WDBODLLDEFS_H_

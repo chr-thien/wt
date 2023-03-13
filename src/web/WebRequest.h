@@ -60,7 +60,7 @@ public:
    *    writes.
    */
   virtual void flush(ResponseState state = ResponseState::ResponseDone,
-		     const WriteCallback& callback = WriteCallback()) = 0;
+                     const WriteCallback& callback = WriteCallback()) = 0;
 #ifdef WT_TARGET_JAVA
   virtual void flushBuffer();
 #endif
@@ -153,7 +153,7 @@ public:
   void setWebSocketRequest(bool ws) { webSocketRequest_ = ws; }
 
   /*
-   * Accesses to cgi environment variables and headers -- rfc2616 name 
+   * Accesses to cgi environment variables and headers -- rfc2616 name
    */
   virtual const char *headerValue(const char *name) const = 0;
 
@@ -190,7 +190,7 @@ public:
   void setResponseType(ResponseType responseType);
   ResponseType responseType() const { return responseType_; }
 
-  /* 
+  /*
    * Returns \c nullptr if the request does not have SSL client certificate
    * information.
    */
@@ -201,6 +201,8 @@ public:
   std::string clientAddress(const Configuration & conf) const;
 
   std::string hostName(const Configuration & conf) const;
+
+  std::string urlScheme(const Configuration & conf) const;
 
 protected:
   const EntryPoint *entryPoint_;
@@ -242,6 +244,10 @@ private:
 
 class WebResponse : public WebRequest
 {
+#ifdef WT_TARGET_JAVA
+public:
+  void addCookie(const Http::Cookie& cookie);
+#endif
 };
 
 }

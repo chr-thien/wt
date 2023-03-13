@@ -86,8 +86,8 @@ public:
   void setFormat(const WString& format);
 
   /*! \brief Returns the progress format string.
-   *  
-   * \sa setFormat() 
+   *
+   * \sa setFormat()
    */
   const WString& format() const { return format_; }
 
@@ -118,6 +118,11 @@ public:
 
   virtual void resize(const WLength& width, const WLength& height) override;
 
+    /*! \brief Updates the style class of the bar part of the WProgressBar.
+     *
+     * This can be used to style the bar part of the WProgressBar, e.g. "progress-bar-success" or "progress-bar-danger".
+     *
+     */
   void setValueStyleClass(const std::string& valueClass);
   void setState(double minimum, double maximum, double value);
 
@@ -141,14 +146,14 @@ protected:
 private:
   double min_, max_, value_;
   WString format_;
-  bool changed_;
+  bool changed_, valueStyleClassChanged_;
   std::string valueStyleClass_;
 
   void onChange();
 
   Signal<double> valueChanged_;
   Signal<> progressCompleted_;
-  
+
   double percentage() const;
 };
 

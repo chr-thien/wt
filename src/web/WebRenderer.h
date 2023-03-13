@@ -14,6 +14,7 @@
 #include "Wt/WDateTime.h"
 #include "Wt/WEnvironment.h"
 #include "Wt/WStatelessSlot.h"
+#include "Wt/Http/Cookie.h"
 
 namespace Wt {
 
@@ -57,7 +58,7 @@ public:
   void saveChanges();
   void discardChanges();
   void letReloadJS(WebResponse& request, bool newSession,
-		   bool embedded = false);
+                   bool embedded = false);
   void letReloadHTML(WebResponse& request, bool newSession);
 
   bool isDirty() const;
@@ -65,13 +66,12 @@ public:
   int pageId() const { return pageId_; }
 
   void serveResponse(WebResponse& request);
-  void serveError(int status, WebResponse& request, 
-		  const std::string& message);
+  void serveError(int status, WebResponse& request,
+                  const std::string& message);
   void serveLinkedCss(WebResponse& request);
 
-  void setCookie(const std::string name, const std::string value,
-		 const WDateTime& expires, const std::string domain,
-		 const std::string path, bool secure);
+  void setCookie(const Http::Cookie& cookie);
+  void removeCookie(const Http::Cookie& cookie);
 
   bool preLearning() const { return learning_; }
   void learningIncomplete();
@@ -83,7 +83,7 @@ public:
     ReasonableAck,
     BadAck
   };
-  
+
   AckState ackUpdate(unsigned int updateId);
 
   void streamRedirectJS(WStringStream& out, const std::string& redirect);
@@ -96,19 +96,11 @@ public:
 
   void setStatelessSlotNotStateless() { currentStatelessSlotIsActuallyStateless_ = false; }
 
+#ifndef WT_TARGET_JAVA
+  static std::string renderCookieHttpHeader(const Http::Cookie& cookie);
+#endif
+
 private:
-  struct CookieValue {
-    std::string value;
-    std::string path;
-    std::string domain;
-    WDateTime expires;
-    bool secure;
-
-    CookieValue();
-    CookieValue(const std::string& v, const std::string& p,
-		const std::string& d, const WDateTime& e, bool secure);
-  };
-
   WebSession& session_;
 
   bool visibleOnly_, rendered_, initialStyleRendered_;
@@ -119,7 +111,7 @@ private:
 
   bool currentStatelessSlotIsActuallyStateless_;
 
-  std::map<std::string, CookieValue> cookiesToSet_;
+  std::vector<Http::Cookie> cookiesToSet_;
 
   FormObjectsMap currentFormObjects_;
   std::string currentFormObjectsList_;
@@ -130,7 +122,7 @@ private:
   bool cookieUpdateNeeded_;
 
   void setHeaders(WebResponse& request, const std::string mimeType);
-  void setCaching(WebResponse& response, bool allowCache);
+  void addNoCacheHeaders(WebResponse& response);
 
   void serveJavaScriptUpdate(WebResponse& response);
   void serveMainscript(WebResponse& response);
@@ -144,15 +136,15 @@ private:
 
   void collectJavaScriptUpdate(WStringStream& out);
   void loadStyleSheet(WStringStream& out, WApplication *app,
-		      const WLinkedCssStyleSheet& sheet);
+                      const WLinkedCssStyleSheet& sheet);
   void loadStyleSheets(WStringStream& out, WApplication *app);
   void removeStyleSheets(WStringStream& out, WApplication *app);
   int loadScriptLibraries(WStringStream& out, WApplication *app,
-			  int count = -1);
+                          int count = -1);
   void updateLoadIndicator(WStringStream& out, WApplication *app, bool all);
   void renderSetServerPush(WStringStream& out);
   void renderStyleSheet(WStringStream& out, const WLinkedCssStyleSheet& sheet,
-			WApplication *app);
+                        WApplication *app);
 
   std::string createFormObjectsList(WApplication *app);
 
@@ -162,11 +154,11 @@ private:
   void collectJS(WStringStream *js);
 
   void setPageVars(FileServe& page);
-  void streamBootContent(WebResponse& response, 
-			 FileServe& boot, bool hybrid);
+  void streamBootContent(WebResponse& response,
+                         FileServe& boot, bool hybrid);
   void addResponseAckPuzzle(WStringStream& out);
   void addContainerWidgets(WWebWidget *w,
-			   std::vector<WContainerWidget *>& v);
+                           std::vector<WContainerWidget *>& v);
 
   std::string headDeclarations() const;
   std::string bodyClassRtl() const;
@@ -183,6 +175,12 @@ private:
 
   void updateMultiSessionCookie(const WebRequest &request);
   void renderCookieUpdate(WStringStream &out);
+
+  /*
+   * See how large the invisible changes are, perhaps we can
+   * send them along in the first request.
+   */
+  void preCollectInvisibleChanges();
 
 public:
   virtual std::string learn(WStatelessSlot* slot) final override;

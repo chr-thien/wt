@@ -75,17 +75,15 @@ void WIntValidator::setInvalidTooSmallText(const WString& text)
 WString WIntValidator::invalidTooSmallText() const
 {
   if (!tooSmallText_.empty()) {
-    WString s = tooSmallText_;
-    s.arg(bottom_).arg(top_);
-    return s;
+    return WString(tooSmallText_).arg(bottom_).arg(top_);
   } else
     if (bottom_ == std::numeric_limits<int>::min())
       return WString();
     else
       if (top_ == std::numeric_limits<int>::max())
-	return WString::tr("Wt.WIntValidator.TooSmall").arg(bottom_);
+        return WString::tr("Wt.WIntValidator.TooSmall").arg(bottom_);
       else
-	return WString::tr("Wt.WIntValidator.BadRange").arg(bottom_).arg(top_);
+        return WString::tr("Wt.WIntValidator.BadRange").arg(bottom_).arg(top_);
 }
 
 void WIntValidator::setInvalidTooLargeText(const WString& text)
@@ -97,23 +95,21 @@ void WIntValidator::setInvalidTooLargeText(const WString& text)
 WString WIntValidator::invalidTooLargeText() const
 {
   if (!tooLargeText_.empty()) {
-    WString s = tooLargeText_;
-    s.arg(bottom_).arg(top_);
-    return s;
+    return WString(tooLargeText_).arg(bottom_).arg(top_);
   } else
     if (top_ == std::numeric_limits<int>::max())
       return WString();
     else
       if (bottom_ == std::numeric_limits<int>::min())
-	return WString::tr("Wt.WIntValidator.TooLarge").arg(top_);
+        return WString::tr("Wt.WIntValidator.TooLarge").arg(top_);
       else
-	return WString::tr("Wt.WIntValidator.BadRange").arg(bottom_).arg(top_);
+        return WString::tr("Wt.WIntValidator.BadRange").arg(bottom_).arg(top_);
 }
 
 void WIntValidator::setIgnoreTrailingSpaces(bool b) {
   if(ignoreTrailingSpaces_ != b)  {
-	ignoreTrailingSpaces_ = b;
-	repaint();
+        ignoreTrailingSpaces_ = b;
+        repaint();
   }
 }
 
@@ -170,7 +166,7 @@ std::string WIntValidator::javaScriptValidate() const
     js << "null";
 
   js << "," << WWebWidget::jsStringLiteral(WLocale::currentLocale()
-					   .groupSeparator())
+                                           .groupSeparator())
      << ',' << invalidBlankText().jsStringLiteral()
      << ',' << invalidNotANumberText().jsStringLiteral()
      << ',' << invalidTooSmallText().jsStringLiteral()

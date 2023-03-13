@@ -113,7 +113,7 @@ public:
 
   /*! \brief Returns the current value.
    *
-   * Returns "yes" when checked, "maybe" when partially checked, and 
+   * Returns "yes" when checked, "maybe" when partially checked, and
    * "no" when unchecked.
    */
   virtual WT_USTRING valueText() const override;
@@ -128,8 +128,8 @@ public:
    *
    * This signal is emitted when the user checks the button.
    *
-   * You can use the changed() signal to react to any change of the
-   * button state.
+   * You can use the changed() signal to react when the user
+   * makes any change to the button state.
    */
   EventSignal<>& checked();
 
@@ -137,13 +137,20 @@ public:
    *
    * This signal is emitted when the user unchecks the button.
    *
-   * You can use the changed() signal to react to any change of the
-   * button state.
+   * You can use the changed() signal to react when the user
+   * makes any change to the button state.
+   *
+   * \remark This signal is not emitted for WRadioButton. In this case
+   * a button can only be unchecked because another button is checked.
+   * The browser will only generate an event for the button which was
+   * checked. Since EventSignal mirrors browser events, Wt will also
+   * not emit this signal. The function WButtonGroup::checkedChanged()
+   * might be easier to use in this case.
    */
   EventSignal<>& unChecked();
 
   virtual void refresh() override;
-  
+
   /*! \brief Configures word wrapping.
    *
    * When \p wordWrap is \c true, the widget may break lines, creating a

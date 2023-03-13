@@ -23,7 +23,6 @@ namespace Wt
 /*! \brief Google Maps API version
  */
 enum class GoogleMapsVersion {
-  v2, //!< API Version 2.x
   v3  //!< API Version 3.x
 };
 
@@ -31,14 +30,14 @@ enum class GoogleMapsVersion {
  */
 enum class MapTypeControl {
   None,         //!< Show no maptype control
-  Default,      //!< Show the default maptype control 
-                // (the behaviour depends on the Google Maps 
+  Default,      //!< Show the default maptype control
+                // (the behavior depends on the Google Maps
                 // API version)
-  Menu,         //!< Show the dropdown menu maptype control
-  Hierarchical, //!< Show the hierarchical maptype control 
-                // (only availble in Google Maps API v2)
+  Menu,         //!< Show the drop-down menu maptype control
+  Hierarchical, //!< Show the hierarchical maptype control
+                // (only available in Google Maps API v2)
   HorizontalBar //!< Show the horizontal bar maptype control
-                // (only availble in Google Maps API v3)
+                // (only available in Google Maps API v3)
 };
 
 /*! \class WGoogleMap Wt/WGoogleMap.h Wt/WGoogleMap.h
@@ -48,7 +47,7 @@ enum class MapTypeControl {
  * exposes a part of the google maps API.
  *
  * This widget supports both version 2 and version 3 of the Google Maps API.
- * The version 2 API is used by default, to enable the version 3 API, use the 
+ * The version 2 API is used by default, to enable the version 3 API, use the
  * constructor's version argument.
  *
  * To use the map on a public server you will need to obtain a
@@ -132,12 +131,12 @@ public:
 
   /*! \brief Adds a polyline overlay to the map.
    *
-   *  Specify a value between 0.0 and 1.0 for the opacity or set the alpha 
+   *  Specify a value between 0.0 and 1.0 for the opacity or set the alpha
    *  value in the color.
    */
   void addPolyline(const std::vector<Coordinate>& points,
-		   const WColor& color = WColor(StandardColor::Red),
-		   int width = 2, double opacity = 1.0);
+                   const WColor& color = WColor(StandardColor::Red),
+                   int width = 2, double opacity = 1.0);
 
   /*! \brief Adds a circle to the map.
    *
@@ -145,9 +144,9 @@ public:
    * the strokeColor and fillColor.
    * This feature is only supported by the Google Maps API version 3.
    */
-  void addCircle(const Coordinate& center, double radius, 
-		 const WColor& strokeColor, int strokeWidth, 
-		 const WColor& fillColor = WColor());
+  void addCircle(const Coordinate& center, double radius,
+                 const WColor& strokeColor, int strokeWidth,
+                 const WColor& fillColor = WColor());
 
   /*! \brief Adds a icon marker overlay to the map.
    */
@@ -304,12 +303,12 @@ protected:
 private:
   std::vector<std::string> additions_;
 
-  void streamJSListener(const JSignal<Coordinate> &signal, 
-			std::string signalName,
-			WStringStream &strm);
+  void streamJSListener(const JSignal<Coordinate> &signal,
+                        std::string signalName,
+                        WStringStream &strm);
 
-  void setMapOption(const std::string &option, 
-		    const std::string &state);
+  void setMapOption(const std::string &option,
+                    const std::string &state);
 
 private:
   GoogleMapsVersion apiVersion_;
@@ -317,7 +316,7 @@ private:
 
 #ifndef WT_TARGET_JAVA
 extern WT_API std::istream& operator>> (std::istream& i,
-				        WGoogleMap::Coordinate& coordinate);
+                                        WGoogleMap::Coordinate& coordinate);
 #endif
 
 } //  namespace Wt

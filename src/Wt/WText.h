@@ -80,7 +80,7 @@ namespace Wt {
  * The widget corresponds to an HTML <tt>&lt;span&gt;</tt> tag or an
  * HTML <tt>&lt;div&gt;</tt> depending on whether the widget is inline.
  *
- * This widget does not provide styling, 
+ * This widget does not provide styling,
  * and can be styled using inline or external CSS as appropriate.
  *
  * \sa WApplication::setLocale()
@@ -102,8 +102,8 @@ public:
    * parsed as valid XML. In that case the textFormat is set to
    * Wt::TextFormat::Plain.
    *
-   * Therefore, if you wish to use Wt::TextFormat::XHTML, 
-   * but cannot be sure about \p text being valid XML, 
+   * Therefore, if you wish to use Wt::TextFormat::XHTML,
+   * but cannot be sure about \p text being valid XML,
    * you should verify that the textFormat() is Wt::TextFormat::XHTML
    * after construction.
    *
@@ -149,6 +149,8 @@ public:
    * parsed using an XML parser which discards malicious tags and
    * attributes silently. When the parser encounters an XML parse
    * error, the textFormat is changed to Wt::TextFormat::Plain.
+   * If \p text is not a literal, the same parser is applied only
+   * when the text is resolved.
    *
    * Returns whether the text could be set using the current
    * textFormat. A return value of \c false indicates that the textFormat
@@ -227,8 +229,8 @@ public:
    * is only supported on the left and/or right. Setting padding on
    * the top or bottom has no effect.
    */
-  void setPadding(const WLength& padding, 
-		  WFlags<Side> sides = Side::Left | Side::Right);
+  void setPadding(const WLength& padding,
+                  WFlags<Side> sides = Side::Left | Side::Right);
 
   /*! \brief Returns the padding set for the widget.
    *

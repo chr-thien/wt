@@ -14,8 +14,7 @@
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string/split.hpp>
-
-#include <sys/stat.h>
+#include <boost/filesystem.hpp>
 
 using namespace Wt;
 
@@ -29,7 +28,7 @@ namespace {
       return b - '0';
     else if (b <= 'F')
       return (b - 'A') + 0x0A;
-    else 
+    else
       return (b - 'a') + 0x0A;
   }
 
@@ -65,34 +64,34 @@ namespace {
       bool cached = false;
 
       for (Git::Cache::iterator i = cache.begin(); i != cache.end(); ++i)
-	if (i->first == s) {
-	  content_ = i->second;
-	  status_ = 0;
-	  cached = true;
-	  cache.splice(cache.begin(), cache, i); // implement LRU
-	  break;
-	}
+        if (i->first == s) {
+          content_ = i->second;
+          status_ = 0;
+          cached = true;
+          cache.splice(cache.begin(), cache, i); // implement LRU
+          break;
+        }
 
       if (!cached) {
-	std::cerr << s << std::endl;
-	FILE *stream = popen((s + "  2>&1").c_str(), "r");
-	if (!stream)
-	  throw Git::Exception("Git: could not execute: '" + s + "'");
+        std::cerr << s << std::endl;
+        FILE *stream = popen((s + "  2>&1").c_str(), "r");
+        if (!stream)
+          throw Git::Exception("Git: could not execute: '" + s + "'");
 
-	int n = 0;
-	do {
-	  char buffer[32000];
-	  n = fread(buffer, 1, 30000, stream);
-	  buffer[n] = 0;
-	  content_ += std::string(buffer, n);
-	} while (n);
+        int n = 0;
+        do {
+          char buffer[32000];
+          n = fread(buffer, 1, 30000, stream);
+          buffer[n] = 0;
+          content_ += std::string(buffer, n);
+        } while (n);
 
-	status_ = pclose(stream);
+        status_ = pclose(stream);
 
-	if (status_ == 0) {
-	  cache.pop_back(); // implement LRU
-	  cache.push_front(std::make_pair(s, content_));
-	}
+        if (status_ == 0) {
+          cache.pop_back(); // implement LRU
+          cache.push_front(std::make_pair(s, content_));
+        }
       }
 
       idx_ = 0;
@@ -102,16 +101,16 @@ namespace {
       r.clear();
 
       while (stripWhite
-	     && (idx_ < content_.length()) && isspace(content_[idx_]))
-	++idx_;
+             && (idx_ < content_.length()) && isspace(content_[idx_]))
+        ++idx_;
 
       while (idx_ < content_.size() && content_[idx_] != '\n') {
-	r += content_[idx_];
-	++idx_;
+        r += content_[idx_];
+        ++idx_;
       }
 
       if (idx_ < content_.size())
-	++idx_;
+        ++idx_;
 
       return r;
     }
@@ -141,7 +140,7 @@ namespace {
        */
       std::string result;
       std::string unsafe = "<>&;|[$`";
- 
+
       for (auto item : cmd) {
         if (unsafe.find(item) == std::string::npos)
           result += item;
@@ -204,10 +203,10 @@ Git::Git()
 { }
 
 void Git::setRepositoryPath(const std::string& repositoryPath)
-{ 
-  struct stat sb;
-  is_bare_ = !(stat((repositoryPath + "/.git").c_str(), &sb) == 0 &&
-               S_ISDIR(sb.st_mode));
+{
+  namespace fs = boost::filesystem;
+  boost::system::error_code ignored;
+  is_bare_ = !fs::is_directory(fs::path(repositoryPath) / ".git", ignored);
   repository_ = repositoryPath;
   checkRepository();
 }
@@ -239,14 +238,14 @@ Git::ObjectId Git::getTreeFromCommit(const ObjectId& commit) const
 {
   std::string treeLine;
   if (!getCmdResult("cat-file -p " + commit.toString(), treeLine, "tree"))
-    throw Exception("Git: could not parse tree from commit '" 
-		    + commit.toString() + "'");
+    throw Exception("Git: could not parse tree from commit '"
+                    + commit.toString() + "'");
 
   std::vector<std::string> v;
   boost::split(v, treeLine, boost::is_any_of(" "));
   if (v.size() != 2)
     throw Exception("Git: could not parse tree from commit '"
-		    + commit.toString() + "': '" + treeLine + "'");
+                    + commit.toString() + "': '" + treeLine + "'");
   return ObjectId(v[1]);
 }
 
@@ -256,18 +255,18 @@ Git::Object Git::treeGetObject(const ObjectId& tree, int index) const
   if (!getCmdResult("cat-file -p " + tree.toString(), objectLine, index))
     throw Exception("Git: could not read object %"
                     + asString(index).toUTF8()
-		    + "  from tree " + tree.toString());
+                    + "  from tree " + tree.toString());
   else {
     std::vector<std::string> v1, v2;
     boost::split(v1, objectLine, boost::is_any_of("\t"));
     if (v1.size() != 2)
       throw Exception("Git: could not parse tree object line: '"
-		      + objectLine + "'");
+                      + objectLine + "'");
     boost::split(v2, v1[0], boost::is_any_of(" "));
     if (v2.size() != 3)
       throw Exception("Git: could not parse tree object line: '"
-		      + objectLine + "'");
- 
+                      + objectLine + "'");
+
     const std::string& stype = v2[1];
     ObjectType type;
     if (stype == "tree")
@@ -299,7 +298,7 @@ std::string Git::baseCmd() const
 }
 
 bool Git::getCmdResult(const std::string& gitCmd, std::string& result,
-		       int index) const
+                       int index) const
 {
   POpenWrapper p(baseCmd() + " " + gitCmd, cache_);
 
@@ -322,7 +321,7 @@ bool Git::getCmdResult(const std::string& gitCmd, std::string& result,
 }
 
 bool Git::getCmdResult(const std::string& gitCmd, std::string& result,
-		       const std::string& tag) const
+                       const std::string& tag) const
 {
   POpenWrapper p(baseCmd() + " " + gitCmd, cache_);
 

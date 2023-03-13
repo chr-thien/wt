@@ -11,29 +11,31 @@
 #include <Wt/WMenu.h>
 
 Layout::Layout()
-  : TopicWidget()
 {
+#if 0
   addText(tr("layout-intro"), this);
+#endif
 }
 
 void Layout::populateSubMenu(Wt::WMenu *menu)
 {
-  menu->addItem("Containers", containers())->setPathComponent("");
+  menu->addItem("Containers",
+                deferCreate([this]{ return containers(); }))->setPathComponent("");
   menu->addItem("HTML Templates",
                 deferCreate([this]{ return templates(); }));
-  menu->addItem("Text", 
+  menu->addItem("Text",
                 deferCreate([this]{ return text(); }));
-  menu->addItem("Grouping widgets", 
+  menu->addItem("Grouping widgets",
                 deferCreate([this]{ return grouping(); }));
-  menu->addItem("Layout managers", 
+  menu->addItem("Layout managers",
                 deferCreate([this]{ return layoutManagers(); }));
-  menu->addItem("Dialogs", 
+  menu->addItem("Dialogs",
                 deferCreate([this]{ return dialogs(); }));
-  menu->addItem("Images", 
+  menu->addItem("Images",
                 deferCreate([this]{ return images(); }));
-  menu->addItem("CSS", 
+  menu->addItem("CSS",
                 deferCreate([this]{ return css(); }));
-  menu->addItem("Themes", 
+  menu->addItem("Themes",
                 deferCreate([this]{ return themes(); }));
 }
 
@@ -58,8 +60,8 @@ std::unique_ptr<Wt::WWidget> Layout::templates()
   result->bindWidget("Template", Template());
 
   // Show the XML-template as text
-  result->bindString("template-text", reindent(tr("WTemplate-example")),
-		     Wt::TextFormat::Plain);
+  result->bindString("template-text", reindent(Wt::WString::tr("WTemplate-example")),
+                     Wt::TextFormat::Plain);
 
   return std::move(result);
 }
@@ -168,8 +170,8 @@ std::unique_ptr<Wt::WWidget> Layout::css()
   result->bindWidget("CSS", CSS());
 
   // Show the style sheet as text
-  result->bindString("CSS-example-style", reindent(tr("CSS-example-style")),
-		     Wt::TextFormat::Plain);
+  result->bindString("CSS-example-style", reindent(Wt::WString::tr("CSS-example-style")),
+                     Wt::TextFormat::Plain);
 
   return std::move(result);
 }
@@ -180,7 +182,7 @@ std::unique_ptr<Wt::WWidget> Layout::themes()
   auto result = std::make_unique<TopicTemplate>("layout-Themes");
 
   // Show the source code only for the theme example.
-  result->bindString("Theme", reindent(tr("theme")), Wt::TextFormat::Plain);
+  result->bindString("Theme", reindent(Wt::WString::tr("theme")), Wt::TextFormat::Plain);
 
   return std::move(result);
 }

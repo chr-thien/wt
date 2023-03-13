@@ -78,8 +78,8 @@ public:
    * the setter methods.
    */
   WTestEnvironment(const std::string& applicationPath,
-		   const std::string& configurationFile,
-		   EntryPointType type = EntryPointType::Application);
+                   const std::string& configurationFile,
+                   EntryPointType type = EntryPointType::Application);
 
 #else
   /*! \brief Default constructor.
@@ -92,7 +92,7 @@ public:
    * the setter methods.
    */
   WTestEnvironment(Configuration *configuration,
-		   EntryPointType type = EntryPointType::Application);
+                   EntryPointType type = EntryPointType::Application);
 
   /*! \brief Closes the test environment.
    *
@@ -249,6 +249,14 @@ public:
    */
   void setInternalPath(const std::string& internalPath);
 
+  /*! \brief Sets the deployment path.
+   *
+   * The default value is "".
+   *
+   * \sa deploymentPath()
+   */
+  void setDeploymentPath(const std::string& deployPath);
+
 #ifndef WT_TARGET_JAVA
   /*! \brief Sets the server's appRoot
    *
@@ -292,7 +300,7 @@ public:
    * event loop. To simulate the delivery of events posted to the
    * application-under-test, by WServer::post(), you need to simulate
    * the release of the session lock.
-   * 
+   *
    * \sa startRequest()
    */
   void endRequest();

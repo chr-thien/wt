@@ -77,10 +77,8 @@ void WTimeValidator::setInvalidNotATimeText(const WString &text)
 
 WString WTimeValidator::invalidNotATimeText() const
 {
-    if(!notATimeText_.empty()){
-        WString s = notATimeText_;
-        s.arg(formats_[0]);
-        return s;
+    if (!notATimeText_.empty()) {
+        return WString(notATimeText_).arg(formats_[0]);
     } else
         return WString::tr("Wt.WTimeValidator.WrongFormat").arg(formats_[0]);
 }
@@ -93,11 +91,9 @@ void WTimeValidator::setInvalidTooEarlyText(const WString &text)
 
 WString WTimeValidator::invalidTooEarlyText() const
 {
-    if(!tooEarlyText_.empty()){
-        WString s = tooEarlyText_;
-        s.arg(bottom_.toString(formats_[0])).arg(top_.toString(formats_[0]));
-        return s;
-    } else{
+    if (!tooEarlyText_.empty()) {
+        return WString(tooEarlyText_).arg(bottom_.toString(formats_[0])).arg(top_.toString(formats_[0]));
+    } else {
         if(bottom_.isNull())
             return WString();
         else{
@@ -118,10 +114,8 @@ void WTimeValidator::setInvalidTooLateText(const WString &text)
 
 WString WTimeValidator::invalidTooLateText() const
 {
-    if(!tooLateText_.empty()){
-        WString s = tooLateText_;
-        s.arg(bottom_.toString(formats_[0])).arg(top_.toString(formats_[0]));
-        return s;
+    if (!tooLateText_.empty()) {
+        return WString(tooLateText_).arg(bottom_.toString(formats_[0])).arg(top_.toString(formats_[0]));
     } else{
         if(top_.isNull())
             return WString();
@@ -145,15 +139,15 @@ WValidator::Result WTimeValidator::validate(const WT_USTRING &input) const
             WTime t = WTime::fromString(input, formats_[i]);
             if(t.isValid()){
                 if(!bottom_.isNull() && t < bottom_)
-		  return Result(ValidationState::Invalid, 
-				invalidTooEarlyText());
+                  return Result(ValidationState::Invalid,
+                                invalidTooEarlyText());
                 if(!top_.isNull() && t > top_)
-		  return Result(ValidationState::Invalid, 
-				invalidTooLateText());
+                  return Result(ValidationState::Invalid,
+                                invalidTooLateText());
                 return Result(ValidationState::Valid);
             }
         } catch (std::exception &e){
-	  LOG_WARN("validate(): " << e.what());
+          LOG_WARN("validate(): " << e.what());
         }
     }
     return Result(ValidationState::Invalid, invalidNotATimeText());

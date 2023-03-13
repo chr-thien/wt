@@ -75,9 +75,7 @@ void WDoubleValidator::setInvalidTooSmallText(const WString& text)
 WString WDoubleValidator::invalidTooSmallText() const
 {
   if (!tooSmallText_.empty()) {
-    WString s = tooSmallText_;
-    s.arg(bottom_).arg(top_);
-    return s;
+    return WString(tooSmallText_).arg(bottom_).arg(top_);
   } else
     if (bottom_ == -std::numeric_limits<double>::max())
       return WString();
@@ -98,9 +96,7 @@ void WDoubleValidator::setInvalidTooLargeText(const WString& text)
 WString WDoubleValidator::invalidTooLargeText() const
 {
   if (!tooLargeText_.empty()) {
-    WString s = tooLargeText_;
-    s.arg(bottom_).arg(top_);
-    return s;
+    return WString(tooLargeText_).arg(bottom_).arg(top_);
   } else
     if (top_ == std::numeric_limits<double>::max())
       return WString();
@@ -114,8 +110,8 @@ WString WDoubleValidator::invalidTooLargeText() const
 
 void WDoubleValidator::setIgnoreTrailingSpaces(bool b) {
   if(ignoreTrailingSpaces_ != b)  {
-	ignoreTrailingSpaces_ = b;
-	repaint();
+        ignoreTrailingSpaces_ = b;
+        repaint();
   }
 }
 
@@ -123,11 +119,11 @@ WValidator::Result WDoubleValidator::validate(const WT_USTRING& input) const
 {
   if (input.empty())
     return WValidator::validate(input);
-  
+
   std::string text = input.toUTF8();
-  
+
   if(ignoreTrailingSpaces_)
-	boost::trim(text);
+        boost::trim(text);
 
   try {
     double i = WLocale::currentLocale().toDouble(text);
@@ -156,8 +152,8 @@ std::string WDoubleValidator::javaScriptValidate() const
 
   js << "new " WT_CLASS ".WDoubleValidator("
      << isMandatory()
-	 << ','
-	 << ignoreTrailingSpaces_
+         << ','
+         << ignoreTrailingSpaces_
      << ',';
 
   if (bottom_ != -std::numeric_limits<double>::max() &&
@@ -175,9 +171,9 @@ std::string WDoubleValidator::javaScriptValidate() const
     js << "null";
 
   js << "," << WWebWidget::jsStringLiteral(WLocale::currentLocale()
-					   .decimalPoint())
+                                           .decimalPoint())
      << "," << WWebWidget::jsStringLiteral(WLocale::currentLocale()
-					   .groupSeparator())
+                                           .groupSeparator())
      << ',' << invalidBlankText().jsStringLiteral()
      << ',' << invalidNotANumberText().jsStringLiteral()
      << ',' << invalidTooSmallText().jsStringLiteral()

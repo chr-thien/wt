@@ -15,6 +15,8 @@
 
 namespace Wt {
 
+LOGGER("WServer/wtisapi");
+
 static WebMain *webMain = 0;
 
 struct WServer::Impl {
@@ -26,7 +28,7 @@ struct WServer::Impl {
   {
     if (!isapi::IsapiServer::instance()->addServer(server))
       throw Exception("WServer::WServer(): "
-		      "Only one simultaneous WServer supported");
+                      "Only one simultaneous WServer supported");
     server->instance_ = server;
 
     std::stringstream approotLog;
@@ -35,18 +37,18 @@ struct WServer::Impl {
       std::string inifile = applicationPath + ".ini";
       char buffer[1024];
       GetPrivateProfileString("isapi", "approot", "",
-	buffer, sizeof(buffer), inifile.c_str());
+        buffer, sizeof(buffer), inifile.c_str());
       approot = buffer;
       if (approot != "") {
-	approotLog << "ISAPI: read approot (" << approot
-	  << ") from ini file " << inifile;
+        approotLog << "ISAPI: read approot (" << approot
+          << ") from ini file " << inifile;
       }
     }
 
     server->setAppRoot(approot);
     server->setConfiguration(configurationFile);
     if (approotLog.str() != "") {
-      server->log("info") << approotLog.str();
+      LOG_INFO_S(server, approotLog.str());
     }
   }
 
@@ -54,7 +56,7 @@ struct WServer::Impl {
 };
 
 WServer::WServer(const std::string& applicationPath,
-		 const std::string& configurationFile)
+                 const std::string& configurationFile)
   : impl_(new Impl())
 {
   init(applicationPath, configurationFile);
@@ -95,7 +97,7 @@ std::vector<WServer::SessionInfo> WServer::sessions() const
 }
 
 void WServer::setServerConfiguration(int argc, char *argv[],
-				     const std::string& serverConfigurationFile)
+                                     const std::string& serverConfigurationFile)
 { }
 
 void WServer::setServerConfiguration(const std::string &applicationName,
@@ -104,11 +106,11 @@ void WServer::setServerConfiguration(const std::string &applicationName,
 { }
 
 //void WServer::addEntryPoint(EntryPointType type, ApplicationCreator callback,
-//			    const std::string& path, const std::string& favicon)
+//                            const std::string& path, const std::string& favicon)
 //{
 //  if (!impl_->configuration())
 //    throw Exception("WServer::addEntryPoint(): "
-//		    "call setServerConfiguration() first");
+//                    "call setServerConfiguration() first");
 //
 //  impl_->configuration()
 //    ->addEntryPoint(EntryPoint(type, callback, path, favicon));
@@ -117,8 +119,13 @@ void WServer::setServerConfiguration(const std::string &applicationName,
 bool WServer::start()
 {
   if (isRunning()) {
-    log("error") << "WServer::start() error: server already started!";
+    LOG_ERROR_S(this, "WServer::start() error: server already started!");
     return false;
+  }
+
+  if (configuration().webSockets()) {
+    LOG_ERROR_S(this, "ISAPI does not support websockets, disabling");
+    configuration().setWebSockets(false);
   }
 
   impl_->running_ = true;
@@ -137,11 +144,11 @@ bool WServer::start()
     webMain = 0;
 
   } catch (std::exception& e) {
-    log("fatal") << "ISAPI server: caught unhandled exception: " << e.what();
+    LOG_ERROR_S(this, "ISAPI server: caught unhandled exception: " << e.what());
 
     throw;
   } catch (...) {
-    log("fatal") << "ISAPI server: caught unknown, unhandled exception.";
+    LOG_ERROR_S(this, "ISAPI server: caught unknown, unhandled exception.");
     throw;
   }
 
@@ -158,10 +165,15 @@ int WServer::httpPort() const
   return -1;
 }
 
+std::string WServer::docRoot() const
+{
+  return "";
+}
+
 void WServer::stop()
 {
   if (!isRunning()) {
-    std::cerr << "WServer::stop() error: server not yet started!" << std::endl;
+    LOG_ERROR_S(this, "WServer::stop() error: server not yet started!");
     return;
   }
   webMain->shutdown();
@@ -189,27 +201,27 @@ void WServer::run()
 //}
 
 //void WServer::schedule(int milliSeconds,
-//		       const boost::function<void ()>& function)
+//                       const boost::function<void ()>& function)
 //{
 //  webMain->schedule(milliSeconds, function);
 //}
 
 //void WServer::post(const std::string& sessionId,
-//		   const boost::function<void ()>& function,
-//		   const boost::function<void ()>& fallbackFunction)
+//                   const boost::function<void ()>& function,
+//                   const boost::function<void ()>& fallbackFunction)
 //{
 //  schedule(0, sessionId, function, fallbackFunction);
 //}
 
 //void WServer::schedule(int milliSeconds,
-//		       const std::string& sessionId,
-//		       const boost::function<void ()>& function,
-//		       const boost::function<void ()>& fallbackFunction)
+//                       const std::string& sessionId,
+//                       const boost::function<void ()>& function,
+//                       const boost::function<void ()>& fallbackFunction)
 //{
 //  ApplicationEvent event(sessionId, function, fallbackFunction);
 //
 //  schedule(milliSeconds, boost::bind(&WebController::handleApplicationEvent,
-//				     &webMain->controller(), event));
+//                                     &webMain->controller(), event));
 //}
 
 //std::string WServer::appRoot() const
@@ -234,7 +246,7 @@ void WServer::run()
 
 void WServer::setSslPasswordCallback(const SslPasswordCallback& cb)
 {
-  log("info") << "setSslPasswordCallback(): has no effect in isapi connector";
+  LOG_INFO_S(this, "setSslPasswordCallback(): has no effect in isapi connector");
 }
 
 int WRun(int argc, char *argv[], ApplicationCreator createApplication)

@@ -7,6 +7,10 @@
 #ifndef WJAVASCRIPTSLOT_H_
 #define WJAVASCRIPTSLOT_H_
 
+#if defined(WT_THREADED) || defined(WT_TARGET_JAVA)
+#include <atomic>
+#endif
+
 #include "Wt/WObject.h"
 
 namespace Wt {
@@ -163,13 +167,13 @@ public:
    * \sa setJavaScript()
    */
   void exec(const std::string& object = "null",
-	    const std::string& event = "null",
-	    const std::string& arg1 = "null",
-	    const std::string& arg2 = "null",
-	    const std::string& arg3 = "null",
-	    const std::string& arg4 = "null",
-	    const std::string& arg5 = "null",
-	    const std::string& arg6 = "null");
+            const std::string& event = "null",
+            const std::string& arg1 = "null",
+            const std::string& arg2 = "null",
+            const std::string& arg3 = "null",
+            const std::string& arg4 = "null",
+            const std::string& arg5 = "null",
+            const std::string& arg6 = "null");
 
   /*! \brief Returns a JavaScript statement that executes the slot.
    *
@@ -181,13 +185,13 @@ public:
    * \sa exec()
    */
    std::string execJs(const std::string& object = "null",
-		      const std::string& event = "null",
-		      const std::string& arg1 = "null",
-		      const std::string& arg2 = "null",
-		      const std::string& arg3 = "null",
-		      const std::string& arg4 = "null",
-		      const std::string& arg5 = "null",
-		      const std::string& arg6 = "null");
+                      const std::string& event = "null",
+                      const std::string& arg1 = "null",
+                      const std::string& arg2 = "null",
+                      const std::string& arg3 = "null",
+                      const std::string& arg4 = "null",
+                      const std::string& arg5 = "null",
+                      const std::string& arg6 = "null");
 
    /*! \brief Returns the number of extra arguments this %JSlot takes.
     */
@@ -205,8 +209,13 @@ private:
   WStatelessSlot* slotimp();
   void create();
 
-  int fid_;
-  static int nextFid_;
+  const unsigned fid_;
+
+#if defined(WT_THREADED) || defined(WT_TARGET_JAVA)
+  static std::atomic<unsigned> nextFid_;
+#else
+  static unsigned nextFid_;
+#endif
 
   int nbArgs_;
 

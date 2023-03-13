@@ -5,12 +5,14 @@
  */
 #include "Wt/WFileUpload.h"
 #include "Wt/WApplication.h"
+#include "Wt/WBootstrap5Theme.h"
 #include "Wt/WEnvironment.h"
 #include "Wt/WLogger.h"
 #include "Wt/WProgressBar.h"
 #include "Wt/WResource.h"
 #include "Wt/Http/Request.h"
 #include "Wt/Http/Response.h"
+#include "Wt/WTheme.h"
 
 #include "DomElement.h"
 #include "WebSession.h"
@@ -20,6 +22,8 @@
 #ifndef _MSC_VER
 #include <unistd.h>
 #endif
+
+#include <memory>
 
 namespace Wt {
 
@@ -38,7 +42,7 @@ public:
 
 protected:
   virtual void handleRequest(const Http::Request& request,
-			     Http::Response& response) override
+                             Http::Response& response) override
   {
     bool triggerUpdate = false;
 
@@ -50,7 +54,7 @@ protected:
 
     if (!request.tooLarge())
       if (!files.empty() || request.getParameter("data"))
-	triggerUpdate = true;
+        triggerUpdate = true;
 
     response.setMimeType("text/html; charset=utf-8");
     response.addHeader("Expires", "Sun, 14 Jun 2020 00:00:00 GMT");
@@ -76,7 +80,7 @@ protected:
 
         // postMessage does not work for IE6,7
         if (agent == UserAgent::IE6 ||
-	    agent == UserAgent::IE7){
+            agent == UserAgent::IE7){
           o << "window.parent."
             << WApplication::instance()->javaScriptClass()
             << "._p_.update(null, '"
@@ -92,13 +96,13 @@ protected:
       } else if (request.tooLarge()) {
         LOG_DEBUG("Resource handleRequest(): signaling file-too-large");
 
-	// FIXME this should use postMessage() all the same
+        // FIXME this should use postMessage() all the same
 
         std::string s = std::to_string(request.tooLarge());
 
         // postMessage does not work for IE6,7
-        if (agent == UserAgent::IE6 || 
-	    agent == UserAgent::IE7) {
+        if (agent == UserAgent::IE6 ||
+            agent == UserAgent::IE7) {
 #ifndef WT_TARGET_JAVA
           o << fileUpload_->fileTooLarge().createCall({s});
 #else
@@ -143,7 +147,15 @@ WFileUpload::WFileUpload()
     displayWidgetRedirect_(this),
     progressBar_(0)
 {
-  setInline(true);
+  auto app = Wt::WApplication::instance();
+  if (app) {
+    auto bs5Theme = std::dynamic_pointer_cast<WBootstrap5Theme>(app->theme());
+    if (bs5Theme) {
+      WWebWidget::setInline(false);
+    } else {
+      WWebWidget::setInline(true);
+    }
+  }
   create();
 }
 
@@ -159,10 +171,10 @@ void WFileUpload::create()
     fileUploadTarget_->dataExceeded().connect(this, &WFileUpload::onDataExceeded);
 
     setJavaScriptMember(WT_RESIZE_JS,
-			"function(self, w, h) {"
-			"""if (w >= 0) "
-			""  "$(self).find('input').width(w);"
-			"}");
+                        "function(self, w, h) {"
+                        """if (w >= 0) "
+                        ""  "self.querySelector('input').style.width = `${w}px`;"
+                        "}");
   } else
     fileUploadTarget_.reset();
 
@@ -206,7 +218,7 @@ void WFileUpload::onData(::uint64_t current, ::uint64_t total)
 void WFileUpload::onDataExceeded(::uint64_t dataExceeded)
 {
   doJavaScript(WT_CLASS ".$('if" + id() + "').src='"
-	       + fileUploadTarget_->url() + "';");
+               + fileUploadTarget_->url() + "';");
   if (flags_.test(BIT_UPLOADING)) {
     flags_.reset(BIT_UPLOADING);
     handleFileTooLarge(dataExceeded);
@@ -360,7 +372,7 @@ void WFileUpload::updateDom(DomElement& element, bool all)
     addStyleClass("Wt-fileupload-hidden");
     displayWidget_->clicked().connect(displayWidgetRedirect_);
   }
-  
+
   // upload() + disable() does not work. -- fix after this release,
   // change order of javaScript_ and properties rendering in DomElement
 
@@ -450,7 +462,7 @@ DomElementType WFileUpload::domElementType() const
 }
 
 void WFileUpload::getDomChanges(std::vector<DomElement *>& result,
-				WApplication *app)
+                                WApplication *app)
 {
   if (flags_.test(BIT_ENABLE_AJAX)) {
     DomElement *plainE = DomElement::getForUpdate(this, DomElementType::INPUT);
@@ -464,10 +476,13 @@ void WFileUpload::getDomChanges(std::vector<DomElement *>& result,
 DomElement *WFileUpload::createDomElement(WApplication *app)
 {
   DomElement *result = DomElement::createNew(domElementType());
-  if (result->type() == DomElementType::FORM)
+  if (result->type() == DomElementType::FORM) {
     result->setId(id());
-  else
+    app->theme()->apply(this, *result, FileUploadForm);
+  } else {
     result->setName(id());
+    app->theme()->apply(this, *result, FileUploadInput);
+  }
 
   EventSignal<> *change = voidEventSignal(CHANGE_SIGNAL, false);
 
@@ -491,7 +506,6 @@ DomElement *WFileUpload::createDomElement(WApplication *app)
     form->setAttribute("method", "post");
     form->setAttribute("action", fileUploadTarget_->url());
     form->setAttribute("enctype", "multipart/form-data");
-    form->setProperty(Property::Style, "margin:0;padding:0;display:inline");
     form->setProperty(Property::Target, "if" + id());
 
     /*
@@ -504,6 +518,7 @@ DomElement *WFileUpload::createDomElement(WApplication *app)
     form->addChild(d);
 
     DomElement *input = DomElement::createNew(DomElementType::INPUT);
+    app->theme()->apply(this, *input, FileUploadInput);
     input->setAttribute("type", "file");
     if (flags_.test(BIT_MULTIPLE))
       input->setAttribute("multiple", "multiple");
@@ -521,9 +536,9 @@ DomElement *WFileUpload::createDomElement(WApplication *app)
     form->addChild(input);
 
     doJavaScript("var a =" + jsRef() + ".action;"
-		 "var f = function(event) {"
-		 """if (a.indexOf(event.origin) === 0) {"
-		 ""  "var data = JSON.parse(event.data);"
+                 "var f = function(event) {"
+                 """if (a.indexOf(event.origin) === 0) {"
+                 ""  "var data = JSON.parse(event.data);"
      ""  "if (data.type === 'upload') {"
      ""    "if (data.fu == '" + id() + "')"
      +        app->javaScriptClass()
@@ -534,14 +549,14 @@ DomElement *WFileUpload::createDomElement(WApplication *app)
 #else
      ""    + fileTooLarge().createCall("data.fileTooLargeSize") +
 #endif
-		 "  ""}"
-		 """}"
-		 "};"
-		 "if (window.addEventListener) "
-		 """window.addEventListener('message', f, false);"
-		 "else "
-		 """window.attachEvent('onmessage', f);"
-		 );
+                 "  ""}"
+                 """}"
+                 "};"
+                 "if (window.addEventListener) "
+                 """window.addEventListener('message', f, false);"
+                 "else "
+                 """window.attachEvent('onmessage', f);"
+                 );
   } else {
     result->setAttribute("type", "file");
     if (flags_.test(BIT_MULTIPLE))

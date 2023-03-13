@@ -68,8 +68,8 @@ WT_API extern std::vector<unsigned char> sha1(const std::string& data);
  *
  * \sa base64Decode()
  */
-WT_API extern std::string base64Encode(const std::string& data, 
-				       bool crlf = true);
+WT_API extern std::string base64Encode(const std::string& data,
+                                       bool crlf = true);
 
 /*! \brief Performs Base64-decoding of data.
  *
@@ -108,7 +108,7 @@ WT_API extern std::string hexDecode(const std::string& data);
  * be embodied verbatim in a HTML text block.
  */
 WT_API extern std::string htmlEncode(const std::string& text,
-				     WFlags<HtmlEncodingFlag> flags = None);
+                                     WFlags<HtmlEncodingFlag> flags = None);
 
 /*! \brief Performs HTML encoding of text.
  *
@@ -119,7 +119,24 @@ WT_API extern std::string htmlEncode(const std::string& text,
  * flag, these may be encoded as line breaks (&lt;br&gt;).
  */
 WT_API extern WString htmlEncode(const WString& text,
-				 WFlags<HtmlEncodingFlag> flags = None);
+                                 WFlags<HtmlEncodingFlag> flags = None);
+
+/*! \brief Escape the given text for inclusion in an HTML attribute
+ *
+ * This utility function escapes characters so that the \p text can
+ * be used as the value of an HTML attribute between double quotes.
+ *
+ * The double quotes are **not** included in the output.
+ *
+ * \if cpp
+ * Example usage:
+ *
+ * ```cpp
+ * std::string attribute = "name=\"" + htmlAttributeValue(value) + "\"";
+ * ```
+ * \endif
+ */
+WT_API extern std::string htmlAttributeValue(const std::string& text);
 
 /*! \brief Performs Url encoding (aka percentage encoding).
  *

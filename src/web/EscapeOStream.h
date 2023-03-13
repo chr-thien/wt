@@ -25,7 +25,7 @@ class WT_ESCAPEOSTREAM_API EscapeOStream
 {
 public:
   enum RuleSet { Empty = 0, HtmlAttribute = 1,
-		 JsStringLiteralSQuote = 2, JsStringLiteralDQuote = 3, 
+                 JsStringLiteralSQuote = 2, JsStringLiteralDQuote = 3,
                  Plain = 4, PlainTextNewLines = 5 };
 
   EscapeOStream();
@@ -56,6 +56,7 @@ public:
 
   EscapeOStream& operator<< (const std::string& s);
   EscapeOStream& operator<< (int);
+  EscapeOStream& operator<< (unsigned int);
   EscapeOStream& operator<< (long long);
   EscapeOStream& operator<< (bool);
   EscapeOStream& operator<< (const EscapeOStream& other);

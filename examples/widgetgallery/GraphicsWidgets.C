@@ -15,17 +15,19 @@
 #include <Wt/WStandardItemModel.h>
 
 GraphicsWidgets::GraphicsWidgets()
-    : TopicWidget()
 {
+#if 0
   addText(tr("graphics-intro"),this);
+#endif
 }
 
 void GraphicsWidgets::populateSubMenu(Wt::WMenu *menu)
 {
   menu->setInternalBasePath("/graphics-charts");
 
-  menu->addItem("2D painting", painting2d())->setPathComponent("");
-  menu->addItem("Paintbrush", 
+  menu->addItem("2D painting",
+                deferCreate([this]{ return painting2d(); }))->setPathComponent("");
+  menu->addItem("Paintbrush",
                 deferCreate([this]{ return paintbrush(); }));
   menu->addItem("Category chart",
                 deferCreate([this]{ return categoryChart(); }));
@@ -33,13 +35,13 @@ void GraphicsWidgets::populateSubMenu(Wt::WMenu *menu)
                 deferCreate([this]{ return scatterPlot(); }));
   menu->addItem("Axis slider widget",
                 deferCreate([this]{ return axisSliderWidget(); }));
-  menu->addItem("Pie chart", 
+  menu->addItem("Pie chart",
                 deferCreate([this]{ return pieChart(); }));
   menu->addItem("Leaflet maps",
                 deferCreate([this]{ return leafletMap(); }));
   menu->addItem("Google maps",
                 deferCreate([this]{ return googleMap(); }));
-  menu->addItem("3D painting", 
+  menu->addItem("3D painting",
                 deferCreate([this]{ return painting3d(); }));
   menu->addItem("3D numerical chart",
                 deferCreate([this]{ return numCharts3d(); }));
@@ -158,7 +160,7 @@ std::unique_ptr<Wt::WWidget> GraphicsWidgets::googleMap()
 
   // Show the XML-template as text
   result->bindString("GoogleMap-controls",
-                     reindent(tr("graphics-GoogleMap-controls")),
+                     reindent(Wt::WString::tr("graphics-GoogleMap-controls")),
                      TextFormat::Plain);
   return std::move(result);
 }
@@ -182,7 +184,7 @@ std::unique_ptr<Wt::WWidget> GraphicsWidgets::numCharts3d()
   auto result = std::make_unique<TopicTemplate>("graphics-NumCharts3D");
 
   result->bindWidget("NumericalCharts3D", NumChart3d());
- 
+
   return std::move(result);
 }
 

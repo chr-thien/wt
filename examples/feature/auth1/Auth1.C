@@ -4,7 +4,7 @@
  * See the LICENSE file for terms of use.
  */
 #include <Wt/WApplication.h>
-#include <Wt/WBootstrapTheme.h>
+#include <Wt/WBootstrap2Theme.h>
 #include <Wt/WContainerWidget.h>
 #include <Wt/WServer.h>
 
@@ -23,7 +23,7 @@ public:
     session_.login().changed().connect(this, &AuthApplication::authEvent);
 
     root()->addStyleClass("container");
-    setTheme(std::make_shared<Wt::WBootstrapTheme>());
+    setTheme(std::make_shared<Wt::WBootstrap2Theme>());
 
     useStyleSheet("css/style.css");
 
@@ -43,9 +43,9 @@ public:
     if (session_.login().loggedIn()) {
       const Wt::Auth::User& u = session_.login().user();
       log("notice")
-	<< "User " << u.id()
-	<< " (" << u.identity(Wt::Auth::Identity::LoginName) << ")"
-	<< " logged in.";
+        << "User " << u.id()
+        << " (" << u.identity(Wt::Auth::Identity::LoginName) << ")"
+        << " logged in.";
     } else
       log("notice") << "User logged out.";
   }

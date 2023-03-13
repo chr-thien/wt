@@ -45,6 +45,10 @@ public:
    */
   AbstractUserDatabase& users() { return users_; }
 
+  /*! \brief Returns the user database.
+   */
+  const AbstractUserDatabase& users() const { return users_; }
+
   /*! \brief Adds a password authentication service.
    *
    * This enables password-based registration, including choosing a proper
@@ -114,8 +118,8 @@ public:
    *
    * Returns whether the user could be logged in.
    */
-  virtual bool loginUser(Login& login, User& user, 
-			 LoginState state = LoginState::Strong);
+  virtual bool loginUser(Login& login, User& user,
+                         LoginState state = LoginState::Strong);
 
 protected:
   void setValid(Field field);

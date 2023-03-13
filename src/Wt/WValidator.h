@@ -19,9 +19,9 @@ class WFormWidget;
 /*! \brief The state in which validated input can exist.
  */
 enum class ValidationState {
-  Invalid,	//!< The input is invalid.
+  Invalid,      //!< The input is invalid.
   InvalidEmpty, //!< The input is invalid (empty and mandatory).
-  Valid	        //!< The input is valid.
+  Valid         //!< The input is valid.
 };
 
 /*! \class WValidator Wt/WValidator.h Wt/WValidator.h
@@ -165,8 +165,6 @@ public:
    * Returns an empty string if the validator does not provide a
    * client-side validation implementationq.
    *
-   * \note The signature and contract changed changed in %Wt 3.1.9.
-   *
    * \sa inputFilter()
    */
   virtual std::string javaScriptValidate() const;
@@ -188,6 +186,9 @@ public:
   virtual std::string inputFilter() const;
 
 protected:
+  /*! \internal
+   * \brief Notifies all form widgets that this validator has changed
+   */
   void repaint();
 
 private:

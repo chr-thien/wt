@@ -15,17 +15,19 @@
 
 #include <iostream>
 
-TreesTables::TreesTables():
-  TopicWidget()
+TreesTables::TreesTables()
 {
+#if 0
   addText(tr("mvc-intro"), this);
+#endif
 }
 
 void TreesTables::populateSubMenu(WMenu *menu)
 {
   menu->setInternalBasePath("/trees-tables");
 
-  menu->addItem("Tables", tables())->setPathComponent("");
+  menu->addItem("Tables",
+                deferCreate([this]{ return tables(); }))->setPathComponent("");
   menu->addItem("Trees",
                 deferCreate([this]{ return trees(); }));
   menu->addItem("Tree Tables",
@@ -45,10 +47,10 @@ void TreesTables::populateSubMenu(WMenu *menu)
 std::unique_ptr<WWidget> TreesTables::tables()
 {
   auto result = std::make_unique<TopicTemplate>("treestables-Tables");
- 
+
   result->bindWidget("PlainTable", PlainTable());
   result->bindWidget("StyledTable", StyledTable());
- 
+
   return std::move(result);
 }
 
@@ -195,7 +197,7 @@ std::unique_ptr<WWidget> TreesTables::proxyModels()
   WPushButton *filter = result->addWidget(std::make_unique<WPushButton>("Apply"));
   filter->clicked().
     connect(this, &TreesTables::changeRegexp);
-  
+
   std::vector<std::shared_ptr<WAbstractItemModel>> models;
   std::vector<WString> headers;
 

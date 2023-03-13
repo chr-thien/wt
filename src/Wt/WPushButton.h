@@ -19,7 +19,7 @@ namespace Wt {
  *  \brief A widget that represents a push button.
  *
  * To act on a button click, connect a slot to the clicked() signal.
- * 
+ *
  * \if cpp
  * Usage example:
  * \code
@@ -131,6 +131,8 @@ public:
    * XML parser which discards malicious tags and attributes
    * silently. When the parser encounters an XML parse error, the
    * textFormat is changed to Wt::TextFormat::Plain.
+   * If \p text is not a literal, the same parser is applied only
+   * when the text is resolved.
    *
    * Returns whether the text could be set using the current
    * textFormat. A return value of \c false indicates that the text
@@ -281,7 +283,7 @@ protected:
   virtual DomElementType domElementType() const override;
   virtual void propagateRenderOk(bool deep) override;
   virtual void getDomChanges(std::vector<DomElement *>& result,
-			     WApplication *app) override;
+                             WApplication *app) override;
   virtual void propagateSetEnabled(bool enabled) override;
 
   virtual void enableAjax() override;

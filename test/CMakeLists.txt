@@ -10,6 +10,7 @@ IF(ENABLE_LIBWTTEST)
     json/JsonParserTest.C
     json/JsonSerializerTest.C
     json/JsonValueTest.C
+    http/CookieTest.C
     http/HttpClientTest.C
     mail/MailClientTest.C
     matrix/MatrixTest.C
@@ -35,9 +36,17 @@ IF(ENABLE_LIBWTTEST)
     utf8/XmlTest.C
     utils/Base64Test.C
     utils/EraseWord.C
+    utils/HtmlEncode.C
+    utils/InfraUtils.C
     utils/ParseNumber.C
+    utils/RoundJsString.C
+    utils/XmlUtils.C
+    validators/WEmailValidator.C
     widgets/WContainerWidgetTest.C
+    widgets/WDateEditTest.C
     widgets/WSpinBoxTest.C
+    widgets/WStackedWidgetTest.C
+    widgets/WTextTest.C
     widgets/WTreeViewTest.C
     length/WLengthTest.C
     color/WColorTest.C
@@ -56,6 +65,10 @@ IF(ENABLE_LIBWTTEST)
      )
   ENDIF(WT_HAS_WRASTERIMAGE)
 
+  if(WT_WITH_SSL)
+    set(TEST_SOURCES ${TEST_SOURCES} utils/SslUtils.C)
+  endif()
+
   ADD_EXECUTABLE(test.wt
     ${TEST_SOURCES}
   )
@@ -64,11 +77,15 @@ IF(ENABLE_LIBWTTEST)
     SET_TARGET_PROPERTIES(test.wt PROPERTIES FOLDER "test")
   ENDIF(MSVC)
 
-  TARGET_LINK_LIBRARIES(test.wt wt wttest ${BOOST_TEST_LIBRARIES} ${BOOST_FS_LIB} ${WT_THREAD_LIB})
+  TARGET_LINK_LIBRARIES(test.wt PRIVATE wt wttest ${BOOST_TEST_LIBRARIES} ${BOOST_FS_LIB} ${WT_THREAD_LIB})
 
   IF(TARGET Boost::headers)
-    TARGET_LINK_LIBRARIES(test.wt Boost::headers)
+    TARGET_LINK_LIBRARIES(test.wt PRIVATE Boost::headers)
   ENDIF()
+
+  if(WT_WITH_SSL)
+    target_link_libraries(test.wt PRIVATE ${OPENSSL_LIBRARIES})
+  endif()
 
   IF(ENABLE_LIBWTDBO)
     # Test all dbo backends
@@ -82,6 +99,7 @@ IF(ENABLE_LIBWTTEST)
       dbo/DboTest6.C
       dbo/DboTest7.C
       dbo/DboTest8.C
+      dbo/DboTest9.C
       dbo/Benchmark.C
       dbo/Benchmark2.C
       dbo/JsonTest.C
@@ -184,8 +202,8 @@ IF(ENABLE_LIBWTTEST)
 
     ADD_EXECUTABLE(test.http ${HTTP_TEST_SOURCES})
     TARGET_LINK_LIBRARIES(test.http wt wthttp ${WT_THREAD_LIB} ${BOOST_TEST_LIBRARIES})
-	IF(MSVC)
-	  SET_TARGET_PROPERTIES(test.http PROPERTIES FOLDER "test")
+    IF(MSVC)
+      SET_TARGET_PROPERTIES(test.http PROPERTIES FOLDER "test")
     ENDIF(MSVC)  
     IF(TARGET Boost::headers)
         TARGET_LINK_LIBRARIES(test.http Boost::headers)

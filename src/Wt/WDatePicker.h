@@ -29,7 +29,7 @@ class WTemplate;
  * Each of these widgets may be accessed individually (lineEdit(),
  * calendar(), and displayWidget()) and there is a constructor that
  * allows you to specify an existing line edit and display widget.
- * 
+ *
  * The date format used by default is <tt>"dd/MM/yyyy"</tt> and can be
  * changed using setFormat(). At any time, the date set may be read
  * using date(), or can be changed using setDate().
@@ -47,6 +47,8 @@ class WTemplate;
  *
  * Internationalization of WDatePicker is mostly handled through
  * the internationalization mechanism of WDate.
+ *
+ * \deprecated The date picker is deprecated in favor of WDateEdit
  */
 class WT_API WDatePicker : public WCompositeWidget
 {
@@ -78,7 +80,7 @@ public:
    * conjunction with the date picker.
    */
   WDatePicker(std::unique_ptr<WInteractWidget> displayWidget,
-	      WLineEdit *forEdit);
+              WLineEdit *forEdit);
 
   /*! \brief Destructor.
    */
@@ -131,7 +133,7 @@ public:
 
   /*! \brief The popup widget.
    *
-   * Returns the popup widget that contains the calendar. 
+   * Returns the popup widget that contains the calendar.
    */
   WPopupWidget *popupWidget() const { return popup_.get(); }
 
@@ -180,7 +182,7 @@ public:
   /*! \brief Returns the bottom date of the valid range.
    */
   WDate bottom() const;
-  
+
   /*! \brief Sets the top of the valid date range.
    */
   void setTop(const WDate& top);
@@ -222,9 +224,8 @@ private:
   Signal<> popupClosed_, changed_;
   JSlot positionJS_;
 
-  void createDefault(WLineEdit *forEdit);
   void create(std::unique_ptr<WInteractWidget> displayWidget,
-	      WLineEdit *forEdit);
+              WLineEdit *forEdit);
 
   void setFromCalendar();
   void setFromLineEdit();

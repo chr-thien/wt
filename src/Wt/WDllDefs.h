@@ -41,7 +41,7 @@
   #if defined(WTHTTP_STATIC) || defined(WTISAPI_STATIC)
     // WTISAPI_STATIC is defined when building WTISAPI,
     // when using ISAPI, the user should also define WTISAPI_STATIC
-    #define WTCONNECTOR_API 
+    #define WTCONNECTOR_API
   #else
     #define WTCONNECTOR_API WT_IMPORT
   #endif
@@ -53,12 +53,15 @@
 #define WT_USTRING Wt::WString
 #define WT_UCHAR std::string
 #define WT_BOSTREAM std::ostream
+#define WT_BAOSTREAM std::ostringstream
 #else
 #define WT_ARRAY volatile
 #define W_JAVA_COMPARATOR(type) : public Comparator<type>
 #define WT_USTRING std::string
 #define WT_UCHAR char
 #define WT_BOSTREAM std::bostream
+// ByteArrayOutputStream
+#define WT_BAOSTREAM std::baostream
 #endif
 
 #ifdef _MSC_VER
@@ -70,19 +73,11 @@ typedef unsigned __int32 uint32_t;  /* 32 bit unsigned */
 #include <stdint.h>
 #endif // _MSC_VER
 
+// Since Wt 4.5.0 we require C++14, so these are always defined
 #ifndef WT_CXX14
-
-#if __cplusplus >= 201402L || _MSVC_LANG >= 201402L
 #define WT_CXX14
-#endif
-
-#ifdef WT_CXX14
 #define WT_CXX14ONLY(x) x
-#else
-#define WT_CXX14ONLY(x)
 #endif
-
-#endif // end outer ifndef WT_CXX14
 
 #ifndef WT_CXX17
 
@@ -97,5 +92,27 @@ typedef unsigned __int32 uint32_t;  /* 32 bit unsigned */
 #endif
 
 #endif // end outer ifndef WT_CXX17
+
+#ifndef WT_DEPRECATED
+#if defined(WT_BUILDING) || defined(WT_CNOR)
+// Don't warn about internal use of deprecated APIs
+#define WT_DEPRECATED(details)
+#else
+#define WT_DEPRECATED(details) [[deprecated(details)]]
+#endif
+#endif
+
+#ifndef WT_FALLTHROUGH
+#  ifndef WT_CNOR
+#    if defined(WT_CXX17)
+#      define WT_FALLTHROUGH [[fallthrough]];
+#    elif defined(__GNUC__)
+#      define WT_FALLTHROUGH __attribute__((fallthrough));
+#    endif
+#  endif
+#  ifndef WT_FALLTHROUGH
+#    define WT_FALLTHROUGH
+#  endif
+#endif
 
 #endif // DLLDEFS_H_

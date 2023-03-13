@@ -33,7 +33,7 @@ namespace {
 }
 
 namespace asio = AsioWrapper::asio;
-		
+
   namespace Mail {
 
 using asio::ip::tcp;
@@ -106,12 +106,16 @@ public:
     // Get a list of endpoints corresponding to the server name.
     tcp::resolver resolver(io_service_);
 
-    tcp::resolver::query query(host, std::to_string(port));
-    tcp::resolver::iterator endpoint_iterator = resolver.resolve(query);
+    AsioWrapper::error_code error = asio::error::host_not_found;
+    tcp::resolver::iterator endpoint_iterator = resolver.resolve(host, std::to_string(port), error);
+    if (error) {
+      LOG_ERROR("could not resolve: '" << host << ":" << port << "': " << error.message());
+      return;
+    }
     tcp::resolver::iterator end;
 
     // Try each endpoint until we successfully establish a connection.
-    AsioWrapper::error_code error = asio::error::host_not_found;
+    error = asio::error::host_not_found;
     while (error && endpoint_iterator != end) {
       close();
       socket().connect(*endpoint_iterator++, error);
@@ -119,7 +123,7 @@ public:
 
     if (error) {
       close();
-      LOG_ERROR("could not connect to: " << host << ":" << port);
+      LOG_ERROR("could not connect to: '" << host << ":" << port << "': " << error.message());
       return;
     }
 
@@ -168,10 +172,10 @@ public:
       send("MAIL FROM:<" + message.from().address() + ">\r\n");
       failIfReplyCodeNot(ReplyCode::Ok);
       for (unsigned i = 0; i < message.recipients().size(); ++i) {
-	const Mailbox& m = message.recipients()[i].mailbox;
+        const Mailbox& m = message.recipients()[i].mailbox;
 
-	send("RCPT TO:<" + m.address() + ">\r\n");
-	failIfReplyCodeNot(ReplyCode::Ok);
+        send("RCPT TO:<" + m.address() + ">\r\n");
+        failIfReplyCodeNot(ReplyCode::Ok);
       }
 
       send("DATA\r\n");
@@ -273,7 +277,7 @@ private:
       in >> code;
 
       if (!in)
-	throw WException("Invalid response");
+        throw WException("Invalid response");
 
       std::string msg;
       std::getline(in, msg);
@@ -281,14 +285,14 @@ private:
       LOG_DEBUG("S " << code << msg);
 
       if (replyCode == -1)
-	replyCode = code;
+        replyCode = code;
       else if (code != replyCode)
-	throw WException("Inconsistent multi-line response");
+        throw WException("Inconsistent multi-line response");
 
       if (msg.length() > 0 && msg[0] == '-')
-	continue;
+        continue;
       else
-	return replyCode;
+        return replyCode;
     }
 
     return -1; // Not reachable
@@ -480,7 +484,7 @@ Client::Client(const std::string& selfHost)
 
     if (!logged)
       LOG_INFO("using '" << configuration_.selfHost_ << "' (from smtp-self-host property) "
-	       "as self host");
+               "as self host");
   } else
     if (!logged)
       LOG_INFO("using '" << configuration_.selfHost_ << "' as self host");
@@ -555,7 +559,7 @@ bool Client::connect()
 {
   std::string smtpHost = "localhost";
   std::string smtpPortStr = "25";
-  
+
   WApplication::readConfigurationProperty("smtp-host", smtpHost);
   WApplication::readConfigurationProperty("smtp-port", smtpPortStr);
 
@@ -563,7 +567,7 @@ bool Client::connect()
 
   if (!logged)
     LOG_INFO("using '" << smtpHost << ":" << smtpPortStr
-	     << "' (from smtp-host and smtp-port properties) as SMTP host");
+             << "' (from smtp-host and smtp-port properties) as SMTP host");
 
   return connect(smtpHost, smtpPort);
 }
@@ -598,6 +602,10 @@ void Client::disconnect()
 
 bool Client::send(const Message& message)
 {
+  if (!(impl_ && impl_->good())) {
+    LOG_ERROR("Can't send message: not connected");
+    return false;
+  }
   return impl_->send(message);
 }
 

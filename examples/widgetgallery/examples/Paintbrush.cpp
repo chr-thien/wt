@@ -19,39 +19,39 @@ public:
     PaintBrush(int width, int height)
         : WPaintedWidget()
     {
-	resize(width, height);
+        resize(width, height);
 
-	decorationStyle().setCursor("icons/pencil.cur", Wt::Cursor::Cross);
+        decorationStyle().setCursor("icons/pencil.cur", Wt::Cursor::Cross);
 
-	mouseDragged().connect(this, &PaintBrush::mouseDrag);
-	mouseWentDown().connect(this, &PaintBrush::mouseDown);
-	touchStarted().connect(this, &PaintBrush::touchStart);
-	touchMoved().connect(this, &PaintBrush::touchMove);
-	touchMoved().preventDefaultAction();
-  
+        mouseDragged().connect(this, &PaintBrush::mouseDrag);
+        mouseWentDown().connect(this, &PaintBrush::mouseDown);
+        touchStarted().connect(this, &PaintBrush::touchStart);
+        touchMoved().connect(this, &PaintBrush::touchMove);
+        touchMoved().preventDefaultAction();
+
         color_ = Wt::WColor(Wt::StandardColor::Black);
     }
 
     void clear() {
-	update();
+        update();
     }
 
     void setColor(const Wt::WColor& c) {
-	color_ = c;
+        color_ = c;
     }
 
 protected:
     virtual void paintEvent(Wt::WPaintDevice *paintDevice) {
         Wt::WPainter painter(paintDevice);
         painter.setRenderHint(Wt::RenderHint::Antialiasing);
-  
+
         Wt::WPen pen;
-	pen.setWidth(3);
-	pen.setColor(color_);
-	pen.setCapStyle(Wt::PenCapStyle::Flat);
-	pen.setJoinStyle(Wt::PenJoinStyle::Miter);
-	painter.setPen(pen);
-	painter.drawPath(path_);
+        pen.setWidth(3);
+        pen.setColor(color_);
+        pen.setCapStyle(Wt::PenCapStyle::Flat);
+        pen.setJoinStyle(Wt::PenJoinStyle::Miter);
+        painter.setPen(pen);
+        painter.drawPath(path_);
 
         path_ = Wt::WPainterPath(path_.currentPosition());
     }
@@ -67,8 +67,8 @@ private:
 
     void mouseDrag(const Wt::WMouseEvent& e) {
         Wt::Coordinates c = e.widget();
-	path_.lineTo(c.x, c.y);
-	update(Wt::PaintFlag::Update);
+        path_.lineTo(c.x, c.y);
+        update(Wt::PaintFlag::Update);
     }
 
     void touchStart(const Wt::WTouchEvent& e) {
@@ -78,8 +78,8 @@ private:
 
     void touchMove(const Wt::WTouchEvent& e) {
         Wt::Coordinates c = e.touches()[0].widget();
-	path_.lineTo(c.x, c.y);
-	update(Wt::PaintFlag::Update);
+        path_.lineTo(c.x, c.y);
+        update(Wt::PaintFlag::Update);
     }
 };
 
@@ -87,7 +87,7 @@ namespace {
 
 extern 
 Wt::WPushButton *createColorToggle(const char *className, const Wt::WColor& color,
-				   PaintBrush *canvas)
+                                   PaintBrush *canvas)
 {
     auto button = new Wt::WPushButton();
     button->setTextFormat(Wt::TextFormat::XHTML);
@@ -96,7 +96,7 @@ Wt::WPushButton *createColorToggle(const char *className, const Wt::WColor& colo
     button->addStyleClass(className);
     button->setWidth(30);
     button->checked().connect([=] {
-	canvas->setColor(color);
+        canvas->setColor(color);
     });
 
     return button;
@@ -107,12 +107,12 @@ Wt::WPushButton *createColorToggle(const char *className, const Wt::WColor& colo
 SAMPLE_BEGIN(Paintbrush)
 
 /* Approximate bootstrap standard colors */
-const Wt::WColor blue(0, 110, 204);                     // btn-primary
-const Wt::WColor red(218, 81, 76);                      // btn-danger
-const Wt::WColor green(59, 195, 95);                    // btn-success
-const Wt::WColor orange(250, 168, 52);                  // btn-warning
-const Wt::WColor black = Wt::WColor(Wt::StandardColor::Black);  // btn-inverse
-const Wt::WColor gray(210, 210, 210);                   // (default)
+const Wt::WColor blue("#0d6efd");                              // btn-primary
+const Wt::WColor red("#dc3545");                               // btn-danger
+const Wt::WColor green("#198754");                             // btn-success
+const Wt::WColor yellow("#ffc107");                            // btn-warning
+const Wt::WColor black = Wt::WColor(Wt::StandardColor::Black); // btn-inverse
+const Wt::WColor gray("#6c757d");                              // btn-secondary
 
 auto result = std::make_unique<Wt::WContainerWidget>();
 
@@ -124,21 +124,21 @@ canvas->decorationStyle().setBorder
 
 #ifndef WT_TARGET_JAVA
 std::vector<Wt::WPushButton *> colorButtons {
-  createColorToggle("btn-primary", blue, canvas.get()),
+  createColorToggle("btn-blue", blue, canvas.get()),
   createColorToggle("btn-danger", red, canvas.get()),
   createColorToggle("btn-success", green, canvas.get()),
-  createColorToggle("btn-warning", orange, canvas.get()),
-  createColorToggle("btn-inverse", black, canvas.get()),
-  createColorToggle("" /* default */, gray, canvas.get())
+  createColorToggle("btn-warning", yellow, canvas.get()),
+  createColorToggle("btn-black", black, canvas.get()),
+  createColorToggle("btn-secondary", gray, canvas.get())
 };
 #else // WT_TARGET_JAVA
 std::vector<Wt::WPushButton *> colorButtons;
-colorButtons.push_back(createColorToggle("btn-primary", blue, canvas.get()));
+colorButtons.push_back(createColorToggle("btn-blue", blue, canvas.get()));
 colorButtons.push_back(createColorToggle("btn-danger", red, canvas.get()));
 colorButtons.push_back(createColorToggle("btn-success", green, canvas.get()));
-colorButtons.push_back(createColorToggle("btn-warning", orange, canvas.get()));
-colorButtons.push_back(createColorToggle("btn-inverse", black, canvas.get()));
-colorButtons.push_back(createColorToggle("" /* default */, gray, canvas.get()));
+colorButtons.push_back(createColorToggle("btn-warning", yellow, canvas.get()));
+colorButtons.push_back(createColorToggle("btn-black", black, canvas.get()));
+colorButtons.push_back(createColorToggle("btn-secondary", gray, canvas.get()));
 #endif // WT_TARGET_JAVA
 
 auto toolBar = std::make_unique<Wt::WToolBar>();

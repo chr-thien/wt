@@ -13,7 +13,7 @@
 # Perl Routines to Manipulate CGI input
 # cgi-lib@pobox.com
 #
-# Copyright (c) 1993-1999 Steven E. Brenner  
+# Copyright (c) 1993-1999 Steven E. Brenner
 # Unpublished work.
 # Permission granted to use and modify this library so long as the
 # copyright above is maintained, modifications are documented, and
@@ -22,18 +22,14 @@
 # Thanks are due to many people for reporting bugs and suggestions
 
 # For more information, see:
-#     http://cgi-lib.stanford.edu/cgi-lib/  
+#     http://cgi-lib.stanford.edu/cgi-lib/
 
  */
 
 #include <fstream>
 #include <stdlib.h>
 
-#ifdef WT_HAVE_GNU_REGEX
-#include <regex.h>
-#else
 #include <regex>
-#endif // WT_HAVE_GNU_REGEX
 
 #include "CgiParser.h"
 #include "WebRequest.h"
@@ -49,23 +45,22 @@ using std::strcpy;
 using std::strtol;
 
 namespace {
-#ifndef WT_HAVE_GNU_REGEX
   const std::regex boundary_e("\\bboundary=(?:(?:\"([^\"]+)\")|(\\S+))",
-			      std::regex::icase);
+                              std::regex::icase);
   const std::regex name_e("\\bname=(?:(?:\"([^\"]+)\")|([^\\s:;]+))",
-			  std::regex::icase);
+                          std::regex::icase);
   const std::regex filename_e("\\bfilename=(?:(?:\"([^\"]*)\")|([^\\s:;]+))",
-			      std::regex::icase);
+                              std::regex::icase);
   const std::regex content_e("^\\s*Content-type:"
-			     "\\s*(?:(?:\"([^\"]+)\")|([^\\s:;]+))",
-			     std::regex::icase);
+                             "\\s*(?:(?:\"([^\"]+)\")|([^\\s:;]+))",
+                             std::regex::icase);
   const std::regex content_disposition_e("^\\s*Content-Disposition:",
-					 std::regex::icase);
+                                         std::regex::icase);
   const std::regex content_type_e("^\\s*Content-Type:",
-				  std::regex::icase);
+                                  std::regex::icase);
 
   bool fishValue(const std::string& text,
-		 const std::regex& e, std::string& result)
+                 const std::regex& e, std::string& result)
   {
     std::smatch what;
 
@@ -80,99 +75,11 @@ namespace {
   {
     return std::regex_search(text, e);
   }
-
-#else
-  regex_t boundary_e, name_e, filename_e, content_e,
-    content_disposition_e, content_type_e;
-
-  const char *boundary_ep = "\\bboundary=((\"([^\"]*)\")|([^ \t]*))";
-  const char *name_ep = "\\bname=((\"([^\"]*)\")|([^ \t:;]*))";
-  const char *filename_ep = "\\bfilename=((\"([^\"]*)\")|([^ \t:;]*))";
-  const char *content_ep = "^[ \t]*Content-type:"
-    "[ \t]*((\"([^\"]*)\")|([^ \t:;]*))";
-  const char *content_disposition_ep = "^[ \t]*Content-Disposition:";
-  const char *content_type_ep = "^[ \t]*Content-Type:";
-
-  bool fishValue(const std::string& text,
-		 regex_t& e1, std::string& result)
-  {
-    regmatch_t pmatch[5];
-    int res = regexec(&e1, text.c_str(), 5, pmatch, 0);
-
-    if (res == 0) {      
-      if (pmatch[3].rm_so != -1)
-	result = text.substr(pmatch[3].rm_so,
-			     pmatch[3].rm_eo - pmatch[3].rm_so);
-      if (pmatch[4].rm_so != -1)
-	result = text.substr(pmatch[4].rm_so,
-			     pmatch[4].rm_eo - pmatch[4].rm_so);
-
-      return true;
-    } else
-      return false;
-  }
-
-  bool regexMatch(const std::string& text, regex_t& e)
-  {
-    regmatch_t pmatch[1];
-
-    return regexec(&e, text.c_str(), 1, pmatch, 0) == 0;
-  }
-
-  class RegInitializer {
-  protected:
-    static bool regInitialized_;
-
-  public:
-    RegInitializer()
-    {}
-
-    ~RegInitializer() {
-      cleanup();
-    }
-
-    static void setup() {
-      if (!regInitialized_) {
-	regcomp(&boundary_e, boundary_ep, REG_ICASE | REG_EXTENDED);
-	regcomp(&name_e, name_ep, REG_ICASE | REG_EXTENDED);
-	regcomp(&filename_e, filename_ep, REG_ICASE | REG_EXTENDED);
-	regcomp(&content_e, content_ep, REG_ICASE | REG_EXTENDED);
-	regcomp(&content_disposition_e, content_disposition_ep,
-		REG_ICASE | REG_EXTENDED);
-	regcomp(&content_type_e, content_type_ep, REG_ICASE | REG_EXTENDED);
-	regInitialized_ = true;
-      }
-    }
-
-    static void cleanup() {
-      if (regInitialized_) {
-	regfree(&boundary_e);
-	regfree(&name_e);
-	regfree(&filename_e);
-	regfree(&content_e);
-	regfree(&content_disposition_e);
-	regfree(&content_type_e);
-	regInitialized_ = false;
-      }
-    }
-  };
-
-  bool RegInitializer::regInitialized_ = false;
-
-  static RegInitializer regInitializer;
-#endif
 }
 
 namespace Wt {
 
 LOGGER("CgiParser");
-
-void CgiParser::init()
-{
-#ifdef WT_HAVE_GNU_REGEX
-  RegInitializer::setup();
-#endif
-}
 
 CgiParser::CgiParser(::int64_t maxRequestSize, ::int64_t maxFormData)
   : maxFormData_(maxFormData),
@@ -205,15 +112,15 @@ void CgiParser::parse(WebRequest& request, ReadOption readOption)
   if (readOption != ReadHeadersOnly &&
       strcmp(meth, "POST") == 0 &&
       ((type && strstr(type, "application/x-www-form-urlencoded") == type) ||
-       (queryString.find("&contentType=x-www-form-urlencoded") != 
-	std::string::npos))) {
+       (queryString.find("&contentType=x-www-form-urlencoded") !=
+        std::string::npos))) {
     /*
      * TODO: parse this stream-based to avoid the malloc here. For now
      * we protect the maximum that can be POST'ed as form data.
      */
     if (len > maxFormData_)
       throw WException("Oversized application/x-www-form-urlencoded ("
-		       + std::to_string(len) + ")");
+                       + std::to_string(len) + ")");
 
     auto buf = std::unique_ptr<char[]>(new char[len + 1]);
 
@@ -244,31 +151,31 @@ void CgiParser::parse(WebRequest& request, ReadOption readOption)
       type && strstr(type, "multipart/form-data") == type) {
     if (strcmp(meth, "POST") != 0) {
       throw WException("Invalid method for multipart/form-data: "
-		       + std::string(meth));
+                       + std::string(meth));
     }
 
     if (!request.postDataExceeded_)
       readMultipartData(request, type, len);
-    else if (readOption == ReadBodyAnyway) {      
+    else if (readOption == ReadBodyAnyway) {
       for (;len > 0;) {
-	::int64_t toRead = std::min(::int64_t(BUFSIZE), len);
-	request.in().read(buf_, toRead);
-	if (request.in().gcount() != (::int64_t)toRead)
-	  throw WException("CgiParser: short read");
-	len -= toRead;
+        ::int64_t toRead = std::min(::int64_t(BUFSIZE), len);
+        request.in().read(buf_, toRead);
+        if (request.in().gcount() != (::int64_t)toRead)
+          throw WException("CgiParser: short read");
+        len -= toRead;
       }
     }
   }
 }
 
 void CgiParser::readMultipartData(WebRequest& request,
-				  const std::string type, ::int64_t len)
+                                  const std::string type, ::int64_t len)
 {
   std::string boundary;
-    
+
   if (!fishValue(type, boundary_e, boundary))
     throw WException("Could not find a boundary for multipart data.");
-    
+
   boundary = "--" + boundary;
 
   buflen_ = 0;
@@ -282,7 +189,7 @@ void CgiParser::readMultipartData(WebRequest& request,
   for (;;) {
     if (!parseHead(request))
       break;
-    if (!parseBody(request,boundary)) 
+    if (!parseBody(request,boundary))
       break;
   }
 }
@@ -295,10 +202,10 @@ void CgiParser::readMultipartData(WebRequest& request,
  * or few (>0) are saved at the start of the boundary in the result.
  */
 void CgiParser::readUntilBoundary(WebRequest& request,
-				  const std::string boundary,
-				  int tossAtBoundary,
-				  std::string *resultString,
-				  std::ostream *resultFile)
+                                  const std::string boundary,
+                                  int tossAtBoundary,
+                                  std::string *resultString,
+                                  std::ostream *resultFile)
 {
   int bpos;
 
@@ -309,7 +216,7 @@ void CgiParser::readUntilBoundary(WebRequest& request,
      */
     if (left_ == 0)
       throw WException("CgiParser: reached end of input while seeking end of "
-		       "headers or content. Format of CGI input is wrong");
+                       "headers or content. Format of CGI input is wrong");
 
     /* save (up to) BUFSIZE from buffer to file or value string, but
      * mind the boundary length */
@@ -317,9 +224,9 @@ void CgiParser::readUntilBoundary(WebRequest& request,
 
     if (save > 0) {
       if (resultString)
-	*resultString += std::string(buf_, save);
-      if (resultFile) 
-	resultFile->write(buf_, save);
+        *resultString += std::string(buf_, save);
+      if (resultFile)
+        resultFile->write(buf_, save);
 
       /* wind buffer */
       windBuffer(save);
@@ -327,9 +234,9 @@ void CgiParser::readUntilBoundary(WebRequest& request,
 
     unsigned amt = static_cast<unsigned>
       (std::min(left_,
-		static_cast< ::int64_t >(BUFSIZE + MAXBOUND - buflen_)));
+                static_cast< ::int64_t >(BUFSIZE + MAXBOUND - buflen_)));
 
-    request.in().read(buf_ + buflen_, amt);    
+    request.in().read(buf_ + buflen_, amt);
     if (request.in().gcount() != (int)amt)
       throw WException("CgiParser: short read");
 
@@ -380,8 +287,8 @@ bool CgiParser::parseHead(WebRequest& request)
     /* read line by line */
     std::string::size_type i = head.find("\r\n", current);
     const std::string text = head.substr(current, (i == std::string::npos
-						   ? std::string::npos
-						   : i - current));
+                                                   ? std::string::npos
+                                                   : i - current));
 
     if (regexMatch(text, content_disposition_e)) {
       fishValue(text, name_e, name);
@@ -411,7 +318,7 @@ bool CgiParser::parseHead(WebRequest& request)
         std::ios::out | std::ios::binary);
 
       request_->files_.insert
-	(std::make_pair(name, Http::UploadedFile(spool, fn, ctype)));
+        (std::make_pair(name, Http::UploadedFile(spool, fn, ctype)));
 
       LOG_DEBUG("spooling file to " << spool.c_str());
 
@@ -433,8 +340,8 @@ bool CgiParser::parseBody(WebRequest& request, const std::string boundary)
   std::string value;
 
   readUntilBoundary(request, boundary, 2,
-		    spoolStream_ ? 0 : (!currentKey_.empty() ? &value : 0),
-		    spoolStream_);
+                    spoolStream_ ? 0 : (!currentKey_.empty() ? &value : 0),
+                    spoolStream_);
 
   if (spoolStream_) {
     LOG_DEBUG("completed spooling");

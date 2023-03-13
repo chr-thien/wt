@@ -11,16 +11,16 @@ using namespace Wt;
 namespace {
 #ifdef WT_EXAMPLE
     struct Employee {
-	std::string firstName;
-	std::string lastName;
-	double pay;
+        std::string firstName;
+        std::string lastName;
+        double pay;
 
-        Employee(const std::string& aFirstName, 
-		 const std::string& aLastName,
-		 double aPay)
-	  : firstName(aFirstName),
-	    lastName(aLastName),
-	    pay(aPay) { }
+        Employee(const std::string& aFirstName,
+                 const std::string& aLastName,
+                 double aPay)
+          : firstName(aFirstName),
+            lastName(aLastName),
+            pay(aPay) { }
     };
 
     Employee employees[] = {
@@ -34,10 +34,10 @@ extern
     void addOptionToggle(WWidget *widget, const char *option,
                          const char *styleClass, WContainerWidget *parent) {
         WCheckBox *checkBox = parent->addNew<WCheckBox>(option);
-	checkBox->setInline(false);
-	checkBox->changed().connect([=] {
-	      widget->toggleStyleClass(styleClass, checkBox->isChecked());
-	});
+        checkBox->setInline(false);
+        checkBox->changed().connect([=] {
+              widget->toggleStyleClass(styleClass, checkBox->isChecked());
+        });
     }
 }
 
@@ -70,7 +70,7 @@ for (unsigned i = 0; i < 3; ++i) {
 #endif // WT_TARGET_JAVA
 }
 
-table_->addStyleClass("table form-inline");
+table_->addStyleClass("table");
 
 #ifndef WT_TARGET_JAVA
 auto resultPtr = std::make_unique<WContainerWidget>();
@@ -89,7 +89,7 @@ result->addNew<WText>("Options:");
 
 addOptionToggle(table_, "borders", "table-bordered", result);
 addOptionToggle(table_, "hover", "table-hover", result);
-addOptionToggle(table_, "condensed", "table-condensed", result);
+addOptionToggle(table_, "small", "table-sm", result);
 addOptionToggle(table_, "stripes", "table-striped", result);
 
 #ifndef WT_TARGET_JAVA
