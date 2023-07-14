@@ -113,12 +113,7 @@ ReplyPtr RequestHandler::handleRequest(Request& req,
 
     if (bestMatch.entryPoint) {
       const Wt::EntryPoint& ep = *bestMatch.entryPoint;
-
-      if (!ep.path().empty())
-        req.request_extra_path = req.request_path.substr(bestMatch.extra);
-
-      req.request_path.resize(bestMatch.extra, '\0');
-
+      req.extra_start_index = bestMatch.extraStartIndex;
       req.url_params = std::move(bestMatch.urlParams);
 
       bool isRedirect = false;

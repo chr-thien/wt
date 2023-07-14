@@ -11,8 +11,8 @@ SET(CMAKE_MODULE_PATH
 )
 
 SET(VERSION_SERIES 4)
-SET(VERSION_MAJOR 9)
-SET(VERSION_MINOR 1)
+SET(VERSION_MAJOR 10)
+SET(VERSION_MINOR 0)
 
 IF(NOT SHARED_LIBS)
   IF(WIN32)
@@ -244,10 +244,15 @@ INCLUDE(cmake/WtFindFcgi.txt)
 INCLUDE(cmake/WtFindMysql.txt)
 INCLUDE(cmake/WtFindPostgresql.txt)
 INCLUDE(cmake/WtFindOdbc.txt)
-INCLUDE(cmake/WtFindAsciidoc.txt)
-INCLUDE(cmake/WtFindHaru.txt)
 INCLUDE(cmake/WtFindGm.txt)
-INCLUDE(cmake/WtFindGL.txt)
+
+find_package(OpenGL)
+find_package(GLEW)
+
+find_package(Asciidoctor)
+
+set(HPDF_ROOT ${HARU_PREFIX})
+find_package(HPDF)
 
 set(OPENSSL_ROOT_DIR ${SSL_PREFIX})
 find_package(OpenSSL)
@@ -422,9 +427,6 @@ IF(WIN32)
     # is not set, but this is problematic for cygwin
     ADD_DEFINITIONS(-DBOOST_THREAD_USE_LIB)
   ENDIF(BOOST_DYNAMIC)
-  IF(HARU_DYNAMIC)
-    ADD_DEFINITIONS(-DHPDF_DLL)
-  ENDIF(HARU_DYNAMIC)
   ADD_DEFINITIONS(
       -D_CRT_SECURE_NO_WARNINGS
       -D_SCL_SECURE_NO_WARNINGS
@@ -449,14 +451,24 @@ ELSE(INSTALL_DOCUMENTATION)
   ADD_CUSTOM_TARGET(doc)
 ENDIF(INSTALL_DOCUMENTATION)
 
-IF (ASCIIDOC_FOUND)
-  MACRO (ASCIIDOC_FILE target infile outfile)
-    ADD_CUSTOM_TARGET(${target}
-       ${ASCIIDOC_EXECUTABLE} -a toc -a numbered -a icons -a  theme=emweb -a pygments -a linkcss -o ${outfile} ${infile}
-       COMMENT "Asciidoc ${infile}")
-    ADD_DEPENDENCIES(doc ${target})
-  ENDMACRO (ASCIIDOC_FILE)
-ENDIF (ASCIIDOC_FOUND)
+if(ASCIIDOCTOR_FOUND)
+  macro(ASCIIDOC_FILE target infile outfile)
+    add_custom_target(${target}
+      Asciidoctor::asciidoctor
+        -a toc
+        -a numbered
+        -a icons=font
+        -a source-highlighter=highlight.js
+        -a linkcss
+        -a stylesheet=wt.css
+        -o "${outfile}"
+        "${infile}"
+       DEPENDS "${infile}"
+       BYPRODUCTS "${outfile}"
+       COMMENT "Asciidoctor ${infile}")
+    add_dependencies(doc ${target})
+  endmacro()
+endif()
 
 IF (DOXYGEN_FOUND)
   ADD_CUSTOM_TARGET(doxygen
@@ -534,10 +546,10 @@ IF(NOT EXISTS ${CONFIGDIR}/wt_config.xml)
   INSTALL(FILES ${WT_BINARY_DIR}/wt_config.xml DESTINATION ${CONFIGDIR})
 ENDIF (NOT EXISTS ${CONFIGDIR}/wt_config.xml)
 
-IF(ENABLE_HARU AND HARU_FOUND)
-  SET(HAVE_HARU ON)
-  SET(WT_HAS_WPDFIMAGE true)
-ENDIF(ENABLE_HARU AND HARU_FOUND)
+if(ENABLE_HARU AND HPDF_FOUND)
+  set(HAVE_HARU ON)
+  set(WT_HAS_WPDFIMAGE true)
+endif()
 
 IF(ENABLE_SSL AND OPENSSL_FOUND)
   SET(HAVE_SSL ON)
@@ -548,10 +560,9 @@ IF(ENABLE_PANGO AND PANGO_FT2_FOUND)
   SET(HAVE_PANGO ON)
 ENDIF(ENABLE_PANGO AND PANGO_FT2_FOUND)
 
-IF(ENABLE_OPENGL AND GL_FOUND AND WT_HAS_WRASTERIMAGE)
-  SET(WT_USE_OPENGL TRUE)
-  SET(HAVE_GL TRUE)
-ENDIF(ENABLE_OPENGL AND GL_FOUND AND WT_HAS_WRASTERIMAGE)
+if(ENABLE_OPENGL AND OPENGL_FOUND AND GLEW_FOUND AND WT_HAS_WRASTERIMAGE)
+  set(WT_USE_OPENGL TRUE)
+endif()
 
 IF(ENABLE_UNWIND AND UNWIND_FOUND)
   SET(HAVE_UNWIND ON)

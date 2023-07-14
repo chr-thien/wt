@@ -371,6 +371,7 @@ web/md5.h web/md5.c
 web/sha1.h web/sha1.c
 web/CgiParser.h web/CgiParser.C
 web/Configuration.h web/Configuration.C
+web/DateUtils.h web/DateUtils.C
 web/DomElement.h web/DomElement.C
 web/EntryPoint.h web/EntryPoint.C
 web/EscapeOStream.h web/EscapeOStream.C
@@ -475,19 +476,9 @@ ELSEIF("${WT_WRASTERIMAGE_IMPLEMENTATION}" STREQUAL "Direct2D")
   SET(libsources ${libsources} Wt/WRasterImage.h Wt/WRasterImage-d2d1.C)
 ENDIF("${WT_WRASTERIMAGE_IMPLEMENTATION}" STREQUAL "GraphicsMagick")
 
-IF(HAVE_GL)
-  SET(libsources ${libsources} Wt/WServerGLWidget.h Wt/WServerGLWidget.C)
-  IF(NOT USE_SYSTEM_GLEW)
-    ADD_DEFINITIONS(-DGLEW_STATIC)
-    SET(libsources
-      ${libsources}
-      3rdparty/glew-1.10.0/include/GL/glew.h
-      3rdparty/glew-1.10.0/include/GL/glxew.h
-      3rdparty/glew-1.10.0/include/GL/wglew.h
-      3rdparty/glew-1.10.0/src/glew.c
-    )
-  ENDIF(NOT USE_SYSTEM_GLEW)
-ENDIF(HAVE_GL)
+if(WT_USE_OPENGL)
+  list(APPEND libsources Wt/WServerGLWidget.h Wt/WServerGLWidget.C)
+endif()
 
 SET(WT_FONTSUPPORT_SIMPLE false)
 SET(WT_FONTSUPPORT_PANGO false)
@@ -631,15 +622,17 @@ ELSE(HAVE_SSL)
   ENDIF(ENABLE_SSL)
 ENDIF(HAVE_SSL)
 
-IF(HAVE_HARU)
-  TARGET_LINK_LIBRARIES(wt PRIVATE ${HARU_LIBRARIES})
-  INCLUDE_DIRECTORIES(${HARU_INCLUDE_DIRS})
-ELSE(HAVE_HARU)
-  MESSAGE("** Disabling PDF support (WPdfImage, WPdfRenderer): requires libharu.")
-  IF(ENABLE_HARU)
-    MESSAGE("   Indicate the location of your haru library using -DHARU_PREFIX=...")
-  ENDIF(ENABLE_HARU)
-ENDIF(HAVE_HARU)
+if(HAVE_HARU)
+  # Even though WPdfImage.h exposes <hpdf.h>, we mark it as private here, because most users of Wt don't need it.
+  # We don't want to include it in the INTERFACE_LINK_LIBRARIES in the generated wt-target-wt.cmake file, since
+  # FindHPDF.cmake is not a standard find module.
+  target_link_libraries(wt PRIVATE HPDF::HPDF)
+else()
+  message("** Disabling PDF support (WPdfImage, WPdfRenderer): requires libharu.")
+  if(ENABLE_HARU)
+    message("   Indicate the location of your haru library using -DHARU_PREFIX=...")
+  endif()
+endif()
 
 IF("${WT_WRASTERIMAGE_IMPLEMENTATION}" STREQUAL "GraphicsMagick")
   TARGET_LINK_LIBRARIES(wt PRIVATE ${GM_LIBRARIES})
@@ -651,15 +644,11 @@ ELSE("${WT_WRASTERIMAGE_IMPLEMENTATION}" STREQUAL "GraphicsMagick")
   MESSAGE("** Disabling raster image support (WRasterImage): set WT_WRASTERIMAGE_IMPLEMENTATION to GraphicsMagick or Direct2D.")
 ENDIF("${WT_WRASTERIMAGE_IMPLEMENTATION}" STREQUAL "GraphicsMagick")
 
-IF(HAVE_GL)
-  INCLUDE_DIRECTORIES(${GL_INCLUDE_DIRS})
-  IF(USE_SYSTEM_GLEW)
-    TARGET_LINK_LIBRARIES(wt PRIVATE GLEW)
-  ENDIF(USE_SYSTEM_GLEW)
-  TARGET_LINK_LIBRARIES(wt PRIVATE ${GL_LIBRARIES})
-ELSE(HAVE_GL)
+if(WT_USE_OPENGL)
+  target_link_libraries(wt PRIVATE OpenGL::GL GLEW::GLEW)
+else()
   MESSAGE("** Disabling server-side opengl rendering for WGLWidget: requires gl, glew and WRasterImage (GraphicsMagick or Direct2D).")
-ENDIF(HAVE_GL)
+endif()
 
 IF(WT_FONTSUPPORT_SIMPLE)
   ADD_DEFINITIONS(-DWT_FONTSUPPORT_SIMPLE)
