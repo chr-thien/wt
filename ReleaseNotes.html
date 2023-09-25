@@ -20,6 +20,61 @@ newer version of Wt. It lists changes in the library that may break
 the way you build Wt, the way you configure Wt or the Wt API and
 behaviour.
 
+<h2>Release 4.10.1 (September 20, 2023)</h2>
+
+<p>
+  Wt 4.10.1 is a patch release that addresses the following issues:
+</p>
+
+<ul>
+  <li>
+    <a href="https://redmine.webtoolkit.eu/issues/10512">Issue #10512</a>:
+    ensures that the disabled state of any <a href="classWt_1_1WWebWidget.html">WWebWidget</a> or <a href="classWt_1_1WCompositeWidget.html">WCompositeWidget</a> is correctly propagated to its children.
+    Before, if a user set a widget as disabled that contained children like a <a href="classWt_1_1WMenu.html">WMenu</a>, a new <a href="classWt_1_1WMenuItem.html">WMenuItem</a> could be added, that was enabled.
+    For some of the affected widgets, this meant that the new item could not be selected, since the signal was not exposed, but in some cases, like with a <code>WMenu</code> this was still possible.
+    The disabled state of a widget now propagates to its children so that a disabled state can be set consistently for a parent. This doesn't actually set <a href="classWt_1_1WCompositeWidget.html#af0186120a0adf80edbc11bc600913ce0">setDisabled()</a> of the children.
+    This state can be set separately to manage the child's disabled state without regard to its parent.
+  </li>
+  <li>
+    <a href="https://redmine.webtoolkit.eu/issues/11804">Issue #11804</a>:
+    the <a href="classWt_1_1WEmailValidator.html">WEmailValidator</a> was corrected. There was a missing case in the client side regex that did not allow a hyphen in the domain of an email address.
+    The server side regex was correct, but nevertheless the case has been added to the tests.
+  </li>
+  <li>
+    <a href="https://redmine.webtoolkit.eu/issues/7645">Issue #7645</a>:
+    a <a href="classWt_1_1WAnchor.html">WAnchor</a> loaded through JavaScript, with progressive bootstrap will correctly add an empty "href" attribute.
+    This allows the item to be selected on the page by pressing the Tab button, allowing keyboard navigation.
+  </li>
+  <li>
+    <a href="https://redmine.webtoolkit.eu/issues/11848">Issue #11848</a>:
+    this corrects an edge-case in <a href="classWt_1_1WSuggestionPopup.html">WSuggestionPopup</a> where forcibly displaying the pop-up via C++ code would cause it to be unfiltered.
+  </li>
+  <li>
+    This is a combination of <a href="https://redmine.webtoolkit.eu/issues/9595">Issue #9595</a> and <a href="https://redmine.webtoolkit.eu/issues/9596">Issue #9596</a>:
+    where the Postgres backend will again rely on standard library functionality (which was substituted in <a href="https://redmine.webtoolkit.eu/issues/9490">Issue #9490</a> for <a href="https://www.boost.org/doc/libs/1_65_0/libs/spirit/doc/html/spirit/introduction.html">boost::spirit</a>).
+    This implementation, however, caused the loss of some precision with floats and doubles. The conversion from and to string now happens with the standard library <a href="https://en.cppreference.com/w/cpp/header/charconv">charconv</a>, which is available in C++17 (or in C++14 as an extension).
+    In case this library is not available, Wt will fall back to <a href="https://en.cppreference.com/w/cpp/string/basic_string/stof">std::stof</a> and <a href="https://en.cppreference.com/w/cpp/string/basic_string/stof">std::stoi</a>, but will still use <code>boost::spirit</code> in case of subnormals (which would result in an out_of_range exception).
+  </li>
+  <li>
+    <a href="https://redmine.webtoolkit.eu/issues/11769">Issue #11769</a>:
+    The MySQL backend will now correctly catch the <a href="https://dev.mysql.com/doc/mysql-errors/8.0/en/server-error-reference.html#error_er_client_interaction_timeout">ER_CLIENT_INTERACTION_TIMEOUT</a> error.
+  </li>
+  <li>
+    <a href="https://redmine.webtoolkit.eu/issues/11302">Issue #11302</a>:
+    when closing a HTTP socket, it was possible that the server just started handling a TCP/SSL request. This resulted in a free-after-use for the listener.
+    The listener is now first checked, so we do not get this race condition.
+  </li>
+  <li>
+    <a href="https://redmine.webtoolkit.eu/issues/11408">Issue #11408</a>:
+    fixed several concurrency issues in the wthttp library.
+  </li>
+  <li>
+    <a href="https://redmine.webtoolkit.eu/issues/11852">Issue #11852</a>:
+    the <a href="classWt_1_1Mail_1_1Message.html">Message</a>'s date header was corrected. In case that a localized abbreviation was defined for the month or day, this string was placed in the header.
+    Some providers / exchanges may reject these emails, since they follow RFC-5322 (<a href="https://www.rfc-editor.org/rfc/rfc5322#page-14">see here</a>) and expect English names.
+  </li>
+</ul>
+
 <h2>Release 4.10.0 (May 30, 2023)</h2>
 
 <p>

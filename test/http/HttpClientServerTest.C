@@ -215,8 +215,10 @@ namespace {
         doneCondition_.wait(guard);
     }
 
-    bool isDone() const
+    bool isDone()
     {
+      std::unique_lock<std::mutex> guard(doneMutex_);
+
       return done_;
     }
 
@@ -673,6 +675,32 @@ BOOST_AUTO_TEST_CASE( http_client_server_clean_shutdown )
 
     client.abort();
     client.waitDone();
+  }
+}
+
+BOOST_AUTO_TEST_CASE( http_server_clean_close )
+{
+  constexpr unsigned ClientCount {1000};
+  Server server;
+
+  server.resource().setType(TestType::Continuation);
+  server.resource().simulateWork();
+
+  if (server.start()) {
+    std::vector<Client *> clients;
+
+    for (unsigned i = 0; i < ClientCount; ++i) {
+      Client *client = new Client();
+      client->get("http://" + server.address() + "/test");
+      clients.push_back(client);
+    }
+
+    server.stop();
+
+    for (unsigned i = 0; i < ClientCount; ++i) {
+      clients[i]->waitDone();
+      delete clients[i];
+    }
   }
 }
 

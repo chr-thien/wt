@@ -15,6 +15,7 @@ IF(ENABLE_LIBWTTEST)
     http/HttpClientTest.C
     formdelegate/WFormDelegate.C
     mail/MailClientTest.C
+    mail/MailMessageTest.C
     matrix/MatrixTest.C
     models/WBatchEditProxyModelTest.C
     models/WFormModelTest.C
@@ -34,6 +35,8 @@ IF(ENABLE_LIBWTTEST)
     render/SpecificityTest.C
     render/WTextRendererTest.C
     strings/WStringTest.C
+    types/WDateTest.C
+    types/WDateTimeTest.C
     utf8/Utf8Test.C
     utf8/XmlTest.C
     utils/Base64Test.C
@@ -45,6 +48,7 @@ IF(ENABLE_LIBWTTEST)
     utils/RoundJsString.C
     utils/XmlUtils.C
     validators/WEmailValidator.C
+    widgets/WCompositeWidgetTest.C
     widgets/WContainerWidgetTest.C
     widgets/WDateEditTest.C
     widgets/WSpinBoxTest.C
