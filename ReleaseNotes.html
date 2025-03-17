@@ -20,6 +20,136 @@ newer version of Wt. It lists changes in the library that may break
 the way you build Wt, the way you configure Wt or the Wt API and
 behaviour.
 
+<h2>Release 4.10.4 (March 6, 2024)</h2>
+
+<p>
+  Wt 4.10.4 is a (smaller) patch release that addresses the following issues.
+  This release is somewhat smaller due to bigger features being in the works.
+  Developers can expect some bigger new features in the authentication framework soon!
+</p>
+
+<ul>
+  <li>
+    <a href="https://redmine.emweb.be/issues/11685">Issue #11685</a>:
+    render child widgets differently when updating an existing widget. The JavaScript code that is being called by the framework to dynamically add children to an HTML element was changed so that it always appends them instead of setting the whole content. This is to avoid a widget that was added in JavaScript (with no C++ counterpart) from being overwritten if the HTML of the parent would be written to.
+  </li>
+  <li>
+    <a href="https://redmine.webtoolkit.eu/issues/12283" target="_blank">Issue #12283</a>:
+    this corrects an additional mistake, made on top of <a href="https://redmine.webtoolkit.eu/issues/12006" target="_blank">Issue #12006</a>.
+  </li>
+  <li>
+    <a href="https://redmine.webtoolkit.eu/issues/12145" target="_blank">Issue #12145</a>:
+    a change to the internal enum class <a href="namespaceWt.html#aeb01f25d7c9d4a4498fb3dadc8d168c5">Property</a> caused an index and its value to be out of sync for a couple values.
+  </li>
+  <li>
+    <a href="https://redmine.webtoolkit.eu/issues/12352" target="_blank">Issues #12352</a>:
+    this corrects a potential crash in Boost spirit, where a grammar parser could encounter a floating point exception, when trying to evaluate unsafe divisions.
+  </li>
+</ul>
+
+<h2>Release 4.10.3 (December 20, 2023)</h2>
+
+<p>
+  Wt 4.10.3 is a patch release that addresses the following issues:
+</p>
+
+<ul>
+  <li>
+    <a href="https://redmine.webtoolkit.eu/issues/12158">Issue #12158</a>:
+    this corrects a mistake in <a href="https://redmine.webtoolkit.eu/issues/7814">Issue #7814</a>, where the cookie path was not correctly set.
+  </li>
+  <li>
+    <a href="https://redmine.webtoolkit.eu/issues/11934">Issue #11934</a>:
+    this corrects the rendering of a vertical <a href="classWt_1_1WSlider.html">WSlider</a> for all themes. Additionally an improvement was made that introduces <a href="classWt_1_1WSlider.html#a0405e2a5aeb71db1b112fa2ca1428cdc">WSlider::setTickLength</a>, that allows users to set the length (width or height of the line, depending on whether the <code>WSlider</code> is <code>Orientation::Horizontal</code> or <code>Orientation::Vertical</code>) of the ticks.
+    For the native slider, ticks have also been enabled. Although both the positioning (the side on which ticks are placed) and their length cannot be changed. Only their interval can be manipulated through <a href="classWt_1_1WSlider.html#a3497303ace2820b3bd457119cec35411">WSlider::setTickInterval</a>.
+  </li>
+  <li>
+    <a href="https://redmine.webtoolkit.eu/issues/12005">Issues #12005</a>:
+    a step value can now be set on a <a href="classWt_1_1WSlider.html">WSlider</a>, using <a href="classWt_1_1WSlider.html#a6f09f1de583156a361a090abc5ec6427">WSlider::setStep</a>.
+    This functions for both the native and non-native sliders. By default the step value is set to 1.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/12022">Issue #12022</a>:
+    solves a case where a JavaScript error can occur if an invisible element on the page receives an update. This is related to <a href="https://redmine.emweb.be/issues/11669">Issue #11669</a>.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/12148">Issue #12148</a>:
+    attributes on the main page's &lt;html&gt; and &lt;body&gt; tags can now be specified. The new functions are:
+    <ul>
+      <li><a href="classWt_1_1WApplication.html#adc77a51995fb3e8224f8bd3cbb5fab86">WApplication::setHtmlAttribute</a></li>
+      <li><a href="classWt_1_1WApplication.html#a555b48a49d202f1db80abc9dad91b61c">WApplication::setBodyAttribute</a></li>
+    </ul>
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/12143">Issue #12143</a>:
+    covered an edge case of <a href="https://redmine.webtoolkit.eu/issues/12006">Issue #12006</a>, that caused JavaScript errors.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/12036">Issue #12036</a>:
+    ensures that if a <a href="classWt_1_1WCheckBox.html">WCheckBox</a> and <a href="classWt_1_1WRadioButton.html">WRadioButton</a> have a custom style class, it remains in place after applying the <a href="classWt_1_1WBootstrap5Theme.html">WBootstrap5Theme</a>.
+  </li>
+  <li>
+    <a href="https://redmine.webtoolkit.eu/issues/11960">Issue #11960</a>:
+    remove an <a href="https://ibpp.sourceforge.io/">IBPP</a> deprecation warning.
+  </li>
+</ul>
+
+<h2>Release 4.10.2 (November 8, 2023)</h2>
+
+<p>
+  Wt 4.10.2 is a patch release that addresses the following issues:
+</p>
+
+<ul>
+  <li>
+    <a href="https://redmine.webtoolkit.eu/issues/11932">Issue #11932</a>:
+    when calling <a href="classWt_1_1WPushButton.html#ae919cb76993211553b50a996bdf80fe9">WPushButton::setMenu</a> after a <a href="classWt_1_1WPopupMenu.html">WPopupMenu</a> had already been added,
+    the second menu wasn't added to the button, and both <code>WPopupMenu</code>s were removed. Now, the new <code>WPopupMenu</code> is correctly added to the button.
+  </li>
+  <li>
+    <a href="https://redmine.webtoolkit.eu/issues/11974">Issue #11974</a>: when dynamically making a field visible in <a href="classWt_1_1Form_1_1Dbo_1_1FormView.html">FormView</a> the form would only show the label and not the corresponding widget. This has now been corrected by having <code>FormView</code> override <a href="classWt_1_1WTemplateFormView.html#ab8ba5bda25fbf612903e5e0fa52f75ae">createFormWidget</a>.
+  </li>
+  <li>
+    <a href="https://redmine.webtoolkit.eu/issues/11984">Issue #11984</a>:
+    corrected <a href="classWt_1_1WTableView.html">WTableView</a>'s drag &amp; drop functionality. When a <a href="classWt_1_1WAbstractItemModel.html">WAbstractItemModel</a>'s items have the flags for drag &amp; drop enabled (found in <a href="group__modelview.html#ga1d77c4de293aebfacbdde124de06b8b0">ItemFlag</a>), the <a href"classWt_1_1WAbstractItemView.html">WAbstractItemView</a> has <a href="classWt_1_1WAbstractItemView.html#a0ca99b835708d990b90000917045738e">setDragEnabled(true)</a> and <a href="classWt_1_1WAbstractItemView.html#a5469c23ea1e9066e98e832ec9da2af21">setEnabledDropLocations()</a> set to <a href="namespaceWt.html#a46e584f830f2d8c9f5b16fcee7affc9b">DropLocation::BetweenRows</a>, the view will now correctly drop the items at the location indicated by the cursor, and will no longer cause an issue when moving the cursor out of the table when dragging.
+  </li>
+  <li>
+    <a href="https://redmine.webtoolkit.eu/issues/11890">Issue #11890</a>:
+    if a user were to delete a <a href="classWt_1_1WPopupWidget.html">WPopupWidget</a>, which they can do as detailed in the <a href="classWt_1_1WPopupWidget.html#details">documentation</a>, they would encounter a use-after-free.
+    This has been corrected, so that the content of a <code>WPopupWidget</code> can be removed when being hidden.
+  </li>
+  <li>
+    <a href="https://redmine.webtoolkit.eu/issues/11985">Issue #11985</a>:
+    ensures that if a <a href="classWt_1_1WStringListModel.html">WStringListModel</a> is used in a <a href="classWt_1_1WTableView.html">WTableView</a> that allows drag & drop, the content of the
+    model is correctly updated.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/12012">Issue #12012</a>:
+    due to an oversight in <a href="https://redmine.webtoolkit.eu/issues/10512">Issue #10512</a>, the keyboard and mouse events for a <a href="classWt_1_1WTreeView.html">WTreeView</a>'s node were missing.
+  </li>
+    <a href="https://redmine.emweb.be/issues/11882">Issue #11882</a>:
+    the <a href="https://developer.mozilla.org/en-US/docs/Web/HTML/Element/fieldset">fieldset</a> element, used by <a href="classWt_1_1WGroupBox.html">WGroupBox</a> has been corrected when using Bootstrap 5.
+    A default HTML value was used here, which caused the content to not be rendered correctly.
+  </li>
+  <li>
+    <a href="https://redmine.webtoolkit.eu/issues/12006">Issue #12006</a>
+    a JavaScript error could occur if no semicolon was added to the JS code when called by <a href="classWt_1_1WWidget.html#ab876fc1b7d2e4e5dfc631e380d406ae2">setJavaScriptMember</a> or <a href="classWt_1_1DomElement.html#a76e75e4259fee4d00f15170eb464682e">callJavaScript</a>.
+  </li>
+  <li>
+    <a href="https://redmine.webtoolkit.eu/issues/11897">Issue #11897</a>:
+    fixed a log that was not configurable. The response to a HTTP request was always logged (like <code>GET /path contentlength</code>).
+    All logs should be configurable, hence it is now logged under <code>info:wthttp</code>.
+  </li>
+  <li>
+    <a href="https://redmine.webtoolkit.eu/issues/11959">Issue #11959</a>:
+    the <code>GetOnePixel</code> deprecation warning from GraphicsMagick was removed.
+  </li>
+  <li>
+    <a href="https://redmine.webtoolkit.eu/issues/7196">Issue #7196</a>:
+    remove a deprecated Pango call. If you compile with Pango enabled, you will no longer see the warning that <code>pango_fc_font_(un)lock_face</code> is deprecated.
+  </li>
+</ul>
+
 <h2>Release 4.10.1 (September 20, 2023)</h2>
 
 <p>

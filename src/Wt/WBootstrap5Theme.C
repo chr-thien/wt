@@ -115,7 +115,7 @@ void WBootstrap5Theme::apply(WWidget *widget, WWidget *child, int widgetRole)
     break;
 
   case MenuItemCheckBox:
-    child->setStyleClass("Wt-chkbox");
+    child->addStyleClass("Wt-chkbox");
     ((WFormWidget *)child)->label()->addStyleClass("form-checkbox");
     break;
 
@@ -401,7 +401,7 @@ void WBootstrap5Theme::apply(WWidget *widget, DomElement& element,
     auto fu = dynamic_cast<WFileUpload *>(widget);
     if (!(tb || sl || fu))
       element.addPropertyWord(Property::Class, "form-control");
-    else if (sl) {
+    else if (sl && !sl->nativeControl()) {
       element.addPropertyWord(Property::Class, "form-range");
 
       if (sl->orientation() == Wt::Orientation::Vertical) {

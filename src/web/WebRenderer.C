@@ -7,6 +7,7 @@
 #include <boost/algorithm/string.hpp>
 #include <regex>
 #include <map>
+#include <unordered_map>
 
 #include "Wt/WApplication.h"
 #include "Wt/WDate.h"
@@ -82,16 +83,15 @@ namespace {
     return Wt::DateUtils::httpDate(expires.toTimePoint());
   }
 
-  std::string renderPath(const Wt::Http::Cookie& cookie)
+  std::string renderPath(const Wt::Http::Cookie& cookie, const std::string& publicDeploymentPath, const std::string& deploymentPath)
   {
     if (!cookie.path().empty()) {
       return cookie.path();
     } else {
-      auto app = Wt::WApplication::instance();
-      if (app) {
-        return app->environment().deploymentPath();
+      if (!publicDeploymentPath.empty()) {
+        return publicDeploymentPath;
       } else {
-        return "";
+        return deploymentPath;
       }
     }
   }
@@ -315,6 +315,12 @@ void WebRenderer::setPageVars(FileServe& page)
     htmlAttr = " class=\"" + app->htmlClass_ + "\"";
   }
 
+  if (app && !app->htmlAttributes().empty()) {
+    for (std::unordered_map<std::string, std::string>::const_iterator i = app->htmlAttributes().begin(); i != app->htmlAttributes().end(); ++i) {
+      htmlAttr += " " + i->first + "=\"" + i->second + "\"";
+    }
+  }
+
   if (session_.env().agentIsIE())
     page.setVar("HTMLATTRIBUTES",
                 "xmlns:v=\"urn:schemas-microsoft-com:vml\""
@@ -331,6 +337,11 @@ void WebRenderer::setPageVars(FileServe& page)
   if (app && app->layoutDirection() == LayoutDirection::RightToLeft)
     attr += " dir=\"RTL\"";
 
+  if (app && !app->bodyAttributes().empty()) {
+    for (std::unordered_map<std::string, std::string>::const_iterator i = app->bodyAttributes().begin(); i != app->bodyAttributes().end(); ++i) {
+      attr += " " + i->first + "=\"" + i->second + "\"";
+    }
+  }
   page.setVar("BODYATTRIBUTES", attr);
 
   page.setVar("HEADDECLARATIONS", headDeclarations());
@@ -537,7 +548,7 @@ void WebRenderer::setHeaders(WebResponse& response, const std::string mimeType)
 {
   for (const auto& cookie : cookiesToSet_) {
 #ifndef WT_TARGET_JAVA
-    response.addHeader("Set-Cookie", renderCookieHttpHeader(cookie));
+    response.addHeader("Set-Cookie", renderCookieHttpHeader(cookie, session_));
 #else
     response.addCookie(cookie);
 #endif
@@ -632,6 +643,7 @@ void WebRenderer::updateMultiSessionCookie(const WebRequest &request)
 {
   Configuration &conf = session_.controller()->configuration();
   Http::Cookie cookie("ms" + request.scriptName(), session_.multiSessionId());
+
 #ifndef WT_TARGET_JAVA
   cookie.setMaxAge(std::chrono::seconds(conf.multiSessionCookieTimeout()));
 #else
@@ -836,6 +848,20 @@ void WebRenderer::collectJavaScript()
     else
       collectedJS1_ << "RTL";
     collectedJS1_ << "');";
+  }
+
+  if (app->htmlAttributeChanged_) {
+    for (std::unordered_map<std::string, std::string>::const_iterator i = app->htmlAttributes().begin(); i != app->htmlAttributes().end(); ++i) {
+      collectedJS1_ << "document.documentElement.setAttribute('" << i->first << "', '" << i->second << "');\n";
+    }
+    app->htmlAttributeChanged_ = false;
+  }
+
+  if (app->bodyAttributeChanged_) {
+    for (std::unordered_map<std::string, std::string>::const_iterator i = app->bodyAttributes().begin(); i != app->bodyAttributes().end(); ++i) {
+      collectedJS1_ << "document.body.setAttribute('" << i->first << "', '" << i->second << "');\n";
+    }
+    app->bodyAttributeChanged_ = false;
   }
 
   if (visibleOnly_) {
@@ -1155,6 +1181,20 @@ void WebRenderer::serveMainAjax(WStringStream& out)
     out << "');";
   }
 
+  if (app->htmlAttributeChanged_) {
+    for (std::unordered_map<std::string, std::string>::const_iterator i = app->htmlAttributes().begin(); i != app->htmlAttributes().end(); ++i) {
+      out << "document.documentElement.setAttribute('" << i->first << "', '" << i->second << "');\n";
+    }
+    app->htmlAttributeChanged_ = false;
+  }
+
+  if (app->bodyAttributeChanged_) {
+    for (std::unordered_map<std::string, std::string>::const_iterator i = app->bodyAttributes().begin(); i != app->bodyAttributes().end(); ++i) {
+      out << "document.body.setAttribute('" << i->first << "', '" << i->second << "');\n";
+    }
+    app->bodyAttributeChanged_ = false;
+  }
+
 #ifdef WT_DEBUG_ENABLED
   WStringStream s;
 #else
@@ -1187,8 +1227,16 @@ void WebRenderer::serveMainAjax(WStringStream& out)
   setRendered(true);
   setJSSynced(true);
 
-  preLearnStateless(app, collectedJS1_);
-
+  // Bugs: #12022 & #11669 (related to #9076)
+  // When rendering, we first collect changes for actual DOM elements.
+  // This ensures that all created items are updated.
+  // Only after that do we collect prelearn stateless slots.
+  //
+  // This avoids an issue where if prelearn stuff is gathered first, while
+  // `visibleOnly_` is `true`, the widget is ignored. Only when we then
+  // collect invisible changes, which calls `preLearnStateless` as well,
+  // but for invisible items, the widget's update JS is wrongly appended
+  // here.
   if (visibleOnly_) {
     preCollectInvisibleChanges();
     if (twoPhaseThreshold_ > 0 && invisibleJS_.length() < static_cast<unsigned>(twoPhaseThreshold_)) {
@@ -1201,6 +1249,8 @@ void WebRenderer::serveMainAjax(WStringStream& out)
                     << "._p_.update(null, 'none', null, false);";
     }
   }
+
+  preLearnStateless(app, collectedJS1_);
 
   LOG_DEBUG("js: " << collectedJS1_.str());
 
@@ -1259,7 +1309,7 @@ void WebRenderer::setJSSynced(bool invisibleToo)
 }
 
 #ifndef WT_TARGET_JAVA
-std::string WebRenderer::renderCookieHttpHeader(const Http::Cookie& cookie)
+std::string WebRenderer::renderCookieHttpHeader(const Http::Cookie& cookie, WebSession& session)
 {
   Wt::WStringStream header;
 
@@ -1276,7 +1326,7 @@ std::string WebRenderer::renderCookieHttpHeader(const Http::Cookie& cookie)
     header << " Domain=" << cookie.domain() << ';';
   }
 
-  auto path = renderPath(cookie);
+  auto path = renderPath(cookie, session.env().publicDeploymentPath_, session.env().deploymentPath());
   if (!path.empty())
     header << " Path=" << path << ';';
 
@@ -1676,6 +1726,18 @@ void WebRenderer::collectJavaScriptUpdate(WStringStream& out)
 
     collectJS(&out);
 
+    // Bugs: #12022 & #11669 (related to #9076)
+    // When rendering visible changes first, and after that the
+    // invisible ones, the invisible changes are wrongly appended
+    // to prelearned stateless slots. So we first collect changes
+    // to invisible items, and only the go over the stateless slots.
+    if (visibleOnly_) {
+      preCollectInvisibleChanges();
+      if (twoPhaseThreshold_ > 0 && invisibleJS_.length() < static_cast<unsigned>(twoPhaseThreshold_)) {
+        collectedJS1_ << invisibleJS_.str();
+        invisibleJS_.clear();
+      }
+    }
     /*
      * Now, as we have cleared and recorded all JavaScript changes that were
      * caused by the actual code, we can learn stateless code and collect
