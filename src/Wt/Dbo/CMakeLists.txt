@@ -26,7 +26,7 @@ IF(ENABLE_LIBWTDBO)
     SqlTraits.h SqlTraits_impl.h SqlTraits.C
     StdSqlTraits.h StdSqlTraits.C
     Transaction.h Transaction.C
-    WtSqlTraits.h WtSqlTraits.C
+    WtSqlTraits.h WtSqlTraits.C WtJsonSqlTraits.h
     EscapeOStream.h EscapeOStream.C
     StringStream.h StringStream.C
     Logger.h Logger.C
@@ -63,6 +63,12 @@ IF(ENABLE_LIBWTDBO)
   INSTALL(EXPORT wt-target-dbo
           DESTINATION ${CMAKE_INSTALL_DIR}/wt
           NAMESPACE Wt::)
+
+  if(MSVC AND SHARED_LIBS)
+    install(FILES $<TARGET_PDB_FILE:wtdbo>
+            DESTINATION bin
+            OPTIONAL)
+  endif()
 
   SET_TARGET_PROPERTIES(
     wtdbo

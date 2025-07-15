@@ -151,7 +151,13 @@ public:
         "<!DOCTYPE html>"
         "<html lang=\"en\" dir=\"ltr\">\n"
         "<head><title></title>\n"
-        "<script type=\"text/javascript\">\n"
+        "<script"
+        " type=\"text/javascript\"";
+      if (!response.nonce().empty()) {
+        o << " nonce=\""<<response.nonce()<<"\"";
+      }
+      o <<
+        ">\n"
         "function load() { "
         """if (window.opener." << appJs << ") {"
         ""  "var " << appJs << "= window.opener." << appJs << ";"
@@ -163,8 +169,9 @@ public:
         ""  "window.close();"
         "}\n"
         "}\n"
+        "window.onload = function() { load(); };\n"
         "</script></head>"
-        "<body onload=\"load();\"></body></html>";
+        "<body></body></html>";
     }
   }
 
@@ -237,14 +244,14 @@ OAuthProcess::~OAuthProcess()
 std::string OAuthProcess::authorizeUrl() const
 {
   WStringStream url;
-  url << service_.authorizationEndpoint();
+  url << authorizationEndpoint();
   bool hasQuery = url.str().find('?') != std::string::npos;
 
   url << (hasQuery ? '&' : '?')
       << "client_id=" << Wt::Utils::urlEncode(service_.clientId())
       << "&redirect_uri="
       << Wt::Utils::urlEncode(service_.generateRedirectEndpoint())
-      << "&scope=" << Wt::Utils::urlEncode(scope_)
+      << "&scope=" << Wt::Utils::urlEncode(scope())
       << "&response_type=code"
       << "&state=" << Wt::Utils::urlEncode(oAuthState_);
 
@@ -304,7 +311,7 @@ void OAuthProcess::connectStartAuthenticate(EventSignalBase &s)
 }
 #endif
 
-void OAuthProcess::getIdentity(const OAuthAccessToken& token)
+void OAuthProcess::getIdentity(WT_MAYBE_UNUSED const OAuthAccessToken& token)
 {
   throw WException("OAuth::Process::Identity(): not specialized");
 }
@@ -339,6 +346,11 @@ void OAuthProcess::handleAuthComplete()
   redirectEndpoint_->haveMoreData();
 }
 #endif // WT_TARGET_JAVA
+
+std::string OAuthProcess::authorizationEndpoint() const
+{
+  return service_.authorizationEndpoint();
+}
 
 void OAuthProcess::requestToken(const std::string& authorizationCode)
 {

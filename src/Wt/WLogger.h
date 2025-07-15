@@ -19,6 +19,7 @@
 
 #include <iostream>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -257,9 +258,31 @@ public:
    */
   bool logging(const std::string& type, const std::string& scope) const;
 
+  /*! \brief Enabled the logger to take locks when logging.
+   *
+   * This enables log entries to be consistently placed on their own
+   * line, upon a log() taking place. Without this functionality, it is
+   * possible that multiple entries can be put on the same line,
+   * followed by an empty line.
+   * 
+   * By default, this is enabled.
+   * 
+   * \note For applications running in a dedicated process mode this
+   *       may not be sufficient.
+   */
+  void setUseLock(bool enable);
+
+  /*! \brief Returns whether the logger use a mutex.
+   *
+   * \sa setUseLock()
+   */
+  bool useLock() const { return useLock_; }
+
 private:
   std::ostream* o_;
   bool ownStream_;
+  bool useLock_;
+  mutable std::mutex addLineLock_;
   std::vector<Field> fields_;
 
   struct Rule {

@@ -62,7 +62,7 @@ WT_DECLARE_WT_MEMBER(1, JavaScriptConstructor, "WPopupMenu", function(APP, el, a
       * for the menu padding and border
       */
     const margin = WT.px(menu, "paddingTop") + WT.px(menu, "borderTopWidth");
-    WT.positionAtWidget(menu.id, menu.parentItem.id, WT.Horizontal, -margin);
+    WT.positionAtWidget(menu.id, menu.parentItem.id, WT.Horizontal, -margin, false, true);
     setOthersInactive(menu, null);
 
     if (WT.isIOS) {
@@ -190,7 +190,7 @@ WT_DECLARE_WT_MEMBER(1, JavaScriptConstructor, "WPopupMenu", function(APP, el, a
 
     if (hidden) {
       el.style.position = "";
-      el.style.display = "";
+      el.style.display = "none";
       el.style.left = "";
       el.style.top = "";
       document.removeEventListener("mousedown", onDocumentDown);

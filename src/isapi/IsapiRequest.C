@@ -433,6 +433,11 @@ void IsapiRequest::setStatus(int status)
   header_ << "Status: " << status << "\r\n";
 }
 
+int IsapiRequest::status()
+{
+  return ecb_->dwHttpStatusCode;
+}
+
 void IsapiRequest::setContentLength(std::int64_t length)
 {
   contentLength_ = length;
@@ -446,6 +451,11 @@ void IsapiRequest::setContentType(const std::string& value)
 void IsapiRequest::addHeader(const std::string& name, const std::string& value)
 {
   header_ << name << " : " << value << "\r\n";
+}
+
+void IsapiRequest::insertHeader(const std::string& name, const std::string& value)
+{
+  addHeader(name, value);
 }
 
 void IsapiRequest::setRedirect(const std::string& url)

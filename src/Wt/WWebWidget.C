@@ -25,8 +25,8 @@
 #include "StringUtils.h"
 #include "XSSFilter.h"
 
-#include "3rdparty/rapidxml/rapidxml.hpp"
-#include "3rdparty/rapidxml/rapidxml_xhtml.hpp"
+#include "thirdparty/rapidxml/rapidxml.hpp"
+#include "thirdparty/rapidxml/rapidxml_xhtml.hpp"
 
 #ifndef WT_DEBUG_JS
 #include "js/WWebWidget.min.js"
@@ -59,7 +59,7 @@ const int WWebWidget::DEFAULT_BASE_Z_INDEX = 1100;
 const int WWebWidget::Z_INDEX_INCREMENT = 1100;
 
 #ifndef WT_TARGET_JAVA
-const std::bitset<38> WWebWidget::AllChangeFlags = std::bitset<38>()
+const std::bitset<42> WWebWidget::AllChangeFlags = std::bitset<42>()
   .set(BIT_FLEX_BOX_CHANGED)
   .set(BIT_HIDDEN_CHANGED)
   .set(BIT_GEOMETRY_CHANGED)
@@ -117,7 +117,7 @@ WWebWidget::OtherImpl::JavaScriptStatement::JavaScriptStatement
     data(aData)
 { }
 
-WWebWidget::OtherImpl::OtherImpl(WWebWidget *const self)
+WWebWidget::OtherImpl::OtherImpl(WT_MAYBE_UNUSED WWebWidget* const self)
   : elementTagName_(nullptr),
     tabIndex_(std::numeric_limits<int>::min()),
     scrollVisibilityMargin_(0)
@@ -131,6 +131,7 @@ WWebWidget::WWebWidget()
 {
   flags_.set(BIT_INLINE);
   flags_.set(BIT_ENABLED);
+  flags_.set(BIT_TOOLTIP_SHOW_ON_HOVER);
 }
 
 
@@ -288,7 +289,7 @@ void WWebWidget::setDecorationStyle(const WCssDecorationStyle& style)
 #endif // WT_TARGET_JAVA
 }
 
-void WWebWidget::iterateChildren(const HandleWidgetMethod& method) const
+void WWebWidget::iterateChildren(WT_MAYBE_UNUSED const HandleWidgetMethod& method) const
 { }
 
 std::string WWebWidget::renderRemoveJs(bool recursive)
@@ -649,11 +650,18 @@ void WWebWidget::setZIndex(int zIndex)
 
 void WWebWidget::setParentWidget(WWidget *parent)
 {
+  flags_.set(BIT_PARENT_CHANGED, parent != this->parent());
   WWidget::setParentWidget(parent);
 
-  if (parent)
-    if (isPopup())
+  if (parent) {
+    if (isPopup()) {
       calcZIndex();
+    }
+
+    if (!isDisabled()) {
+      propagateSetEnabled(parent->isEnabled());
+    }
+  }
 }
 
 WWebWidget *WWebWidget::parentWebWidget() const
@@ -1028,6 +1036,36 @@ void WWebWidget::setToolTip(const WString& text, TextFormat textFormat)
   repaint();
 }
 
+void WWebWidget::showToolTipOnHover(bool enable)
+{
+  if (enable) {
+    flags_.set(BIT_TOOLTIP_SHOW_ON_HOVER);
+  }
+  else {
+    flags_.reset(BIT_TOOLTIP_SHOW_ON_HOVER);
+    flags_.set(BIT_TOOLTIP_CLEAN_FORCE_SHOW);
+  }
+
+  flags_.set(BIT_TOOLTIP_CHANGED);
+
+  repaint();
+}
+
+void WWebWidget::showToolTip()
+{
+  flags_.set(BIT_TOOLTIP_FORCE_SHOW);
+  flags_.set(BIT_TOOLTIP_CHANGED);
+  repaint();
+}
+
+void WWebWidget::hideToolTip()
+{
+  flags_.reset(BIT_TOOLTIP_FORCE_SHOW);
+  flags_.set(BIT_TOOLTIP_CHANGED);
+  flags_.set(BIT_TOOLTIP_CLEAN_FORCE_SHOW);
+  repaint();
+}
+
 WString WWebWidget::toolTip() const
 {
   return storedToolTip();
@@ -1147,7 +1185,10 @@ bool WWebWidget::isVisible() const
 
 void WWebWidget::setDisabled(bool disabled)
 {
-  if (canOptimizeUpdates() && (disabled == flags_.test(BIT_DISABLED)))
+  // WT-13115: If the widget was disabled due to a parent widget and the parent
+  // widget changed, then we must skip the optimization and determine whether
+  // the widget should still be disabled.
+  if (canOptimizeUpdates() && (disabled == flags_.test(BIT_DISABLED)) && !flags_.test(BIT_PARENT_CHANGED))
     return;
 
   bool wasEnabled = isEnabled();
@@ -1170,6 +1211,11 @@ void WWebWidget::setDisabled(bool disabled)
 
 void WWebWidget::propagateSetEnabled(bool enabled)
 {
+  // Apply visual styling
+  WApplication *app = WApplication::instance();
+  std::string disabledClass = app->theme()->disabledClass();
+  toggleStyleClass(disabledClass, !enabled, true);
+
   iterateChildren
     ([=](WWidget *c) {
       if (!c->isDisabled())
@@ -1574,7 +1620,9 @@ void WWebWidget::updateDom(DomElement& element, bool all)
                    flags_.test(BIT_TOOLTIP_DEFERRED))) {
         if (!app) app = WApplication::instance();
         if ( (lookImpl_->toolTipTextFormat_ != TextFormat::Plain
-              || flags_.test(BIT_TOOLTIP_DEFERRED))
+              || flags_.test(BIT_TOOLTIP_DEFERRED) 
+              || flags_.test(BIT_TOOLTIP_FORCE_SHOW) 
+              || flags_.test(BIT_TOOLTIP_CLEAN_FORCE_SHOW))
             && app->environment().ajax()) {
           LOAD_JAVASCRIPT(app, "js/ToolTip.js", "toolTip", wtjs10);
 
@@ -1587,14 +1635,23 @@ void WWebWidget::updateDom(DomElement& element, bool all)
               tooltipText = escapeText(*lookImpl_->toolTip_);
             }
           }
+          bool jsShowOnHover =  flags_.test(BIT_TOOLTIP_SHOW_ON_HOVER) &&
+                                (flags_.test(BIT_TOOLTIP_DEFERRED) ||
+                                  lookImpl_->toolTipTextFormat_ != TextFormat::Plain);
 
           std::string deferred = flags_.test(BIT_TOOLTIP_DEFERRED) ?
+                "true" : "false";
+          std::string showOnHover = jsShowOnHover ?
+                "true" : "false";
+          std::string forceShow = flags_.test(BIT_TOOLTIP_FORCE_SHOW) ?
                 "true" : "false";
           element.callJavaScript(WT_CLASS ".toolTip(" +
                                  app->javaScriptClass() + ","
                                  + jsStringLiteral(id()) + ","
                                  + tooltipText.jsStringLiteral()
+                                 + ", " + forceShow
                                  + ", " + deferred
+                                 + ", " + showOnHover
                                  + ", " +
                                  jsStringLiteral(app->theme()->
                                                  utilityCssClass(ToolTipInner))
@@ -1606,10 +1663,24 @@ void WWebWidget::updateDom(DomElement& element, bool all)
           if (flags_.test(BIT_TOOLTIP_DEFERRED) &&
               !lookImpl_->loadToolTip_.isConnected())
             lookImpl_->loadToolTip_.connect(this, &WWebWidget::loadToolTip);
+          
+          if (flags_.test(BIT_TOOLTIP_SHOW_ON_HOVER) &&
+              !jsShowOnHover &&
+              !flags_.test(BIT_TOOLTIP_FORCE_SHOW))
+          {
+            element.setAttribute("title", lookImpl_->toolTip_->toUTF8());
+          } 
+          else {
+            element.removeAttribute("title");
+          }
 
-          element.removeAttribute("title");
-        } else
+          flags_.reset(BIT_TOOLTIP_CLEAN_FORCE_SHOW);
+
+        } 
+        else if (flags_.test(BIT_TOOLTIP_SHOW_ON_HOVER)) 
           element.setAttribute("title", lookImpl_->toolTip_->toUTF8());
+
+         else element.removeAttribute("title");
       }
 
       flags_.reset(BIT_TOOLTIP_CHANGED);
@@ -1668,12 +1739,19 @@ void WWebWidget::updateDom(DomElement& element, bool all)
     if (flags_.test(BIT_SET_UNSELECTABLE)) {
       element.addPropertyWord(Property::Class, "unselectable");
       element.setAttribute("unselectable", "on");
-      element.setAttribute("onselectstart", "return false;");
+      // All event handlers ought to be JS, not DOM: #13501
+      WStringStream selectJS;
+      selectJS << WT_CLASS << ".$('" << id() << "').onselectstart = "
+               << "function() { return false; };";
+      Wt::WApplication::instance()->doJavaScript(selectJS.str());
     } else if (flags_.test(BIT_SET_SELECTABLE)) {
       element.addPropertyWord(Property::Class, "selectable");
       element.setAttribute("unselectable", "off");
-      element.setAttribute("onselectstart",
-                           "event.cancelBubble=true; return true;");
+      // All event handlers ought to be JS, not DOM: #13501
+      WStringStream selectJS;
+      selectJS << WT_CLASS << ".$('" << id() << "').onselectstart = "
+               << "function() { event.cancelBubble=true; return false; };";
+      Wt::WApplication::instance()->doJavaScript(selectJS.str());
     }
 
     flags_.reset(BIT_SELECTABLE_CHANGED);
@@ -2092,7 +2170,7 @@ void WWebWidget::getFormObjects(FormObjectsMap& formObjects)
 }
 
 void WWebWidget::getDomChanges(std::vector<DomElement *>& result,
-                               WApplication *app)
+                               WT_MAYBE_UNUSED WApplication* app)
 {
   DomElement *e = DomElement::getForUpdate(this, domElementType());
   updateDom(*e, false);
@@ -2164,6 +2242,7 @@ void WWebWidget::propagateRenderOk(bool deep)
   flags_.reset(BIT_TABINDEX_CHANGED);
   flags_.reset(BIT_SCROLL_VISIBILITY_CHANGED);
   flags_.reset(BIT_OBJECT_NAME_CHANGED);
+  flags_.reset(BIT_PARENT_CHANGED);
 #endif
 
   renderOk();

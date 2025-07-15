@@ -6,6 +6,7 @@
 #include "Wt/Json/Object.h"
 #include "Wt/WApplication.h"
 #include "Wt/WEnvironment.h"
+#include "Wt/WLogger.h"
 #include "Wt/WMemoryResource.h"
 #include "Wt/WServer.h"
 #include "Wt/WSignal.h"
@@ -21,7 +22,30 @@
 #include "js/WFileDropWidget.min.js"
 #endif
 
+namespace {
+  std::vector<Wt::WFileDropWidget::File*> flattenUploadsVector(Wt::WFileDropWidget::Directory *dir) {
+    std::vector<Wt::WFileDropWidget::File*> retVal;
+    for (Wt::WFileDropWidget::File *entry : dir->contents()) {
+      if (!entry->directory()) {
+        retVal.push_back(entry);
+      } else {
+        auto subdirEntries = flattenUploadsVector(dynamic_cast<Wt::WFileDropWidget::Directory*>(entry));
+#ifndef WT_TARGET_JAVA
+        retVal.insert(retVal.end(), subdirEntries.begin(), subdirEntries.end());
+#else
+        for (auto subdirEntry : subdirEntries) {
+          retVal.push_back(subdirEntry);
+        }
+#endif
+      }
+    }
+    return retVal;
+  }
+}
+
 namespace Wt {
+
+LOGGER("WFileDropWidget");
 
 class WFileDropWidget::WFileDropUploadResource final : public WResource {
 public:
@@ -100,11 +124,11 @@ const std::string WFileDropWidget::WORKER_JS =
 #include "js/WFileDropWidget_worker.min.js"
   ;
 
-WFileDropWidget::File::File(int id, const std::string& fileName,
-                            const std::string& type, ::uint64_t size,
-                            ::uint64_t chunkSize)
+WFileDropWidget::File::File(int id, const std::string& fileName, const std::string& path,
+                             const std::string& type, ::uint64_t size, ::uint64_t chunkSize)
   : id_(id),
     clientFileName_(fileName),
+    path_(path),
     type_(type),
     size_(size),
     uploadStarted_(false),
@@ -116,11 +140,27 @@ WFileDropWidget::File::File(int id, const std::string& fileName,
     chunkSize_(chunkSize)
 { }
 
+WFileDropWidget::Directory::Directory(const std::string& fileName, const std::string& path)
+  : File(-1, fileName, path, "", 0, 0)
+{ }
+
+void WFileDropWidget::Directory::addFile(WFileDropWidget::File *file) {
+  contents_.push_back(file);
+}
+
 const Http::UploadedFile& WFileDropWidget::File::uploadedFile() const {
-  if (!uploadFinished_)
+  if (directory()) {
+    throw WException("Directory: no file to upload.");
+  } else if (!uploadFinished_) {
     throw WException("Can not access uploaded files before upload is done.");
-  else
+  } else {
     return uploadedFile_;
+  }
+}
+
+bool WFileDropWidget::File::uploadFinished() const
+{
+  return !directory() ? uploadFinished_ : true;
 }
 
 void WFileDropWidget::File::handleIncomingData(const Http::UploadedFile& file, bool last)
@@ -141,6 +181,9 @@ void WFileDropWidget::File::handleIncomingData(const Http::UploadedFile& file, b
 
 void WFileDropWidget::File::cancel()
 {
+  if (directory()) {
+    throw Wt::WException("Directory: cannot directly cancel, you must iterate over the contents.");
+  }
   cancelled_ = true;
 }
 
@@ -184,6 +227,8 @@ WFileDropWidget::WFileDropWidget()
     acceptAttributes_(""),
     dropIndicationEnabled_(false),
     globalDropEnabled_(false),
+    acceptDirectories_(false),
+    acceptDirectoriesRecursive_(false),
     dropSignal_(this, "dropsignal"),
     requestSend_(this, "requestsend"),
     fileTooLarge_(this, "filetoolarge"),
@@ -259,41 +304,106 @@ void WFileDropWidget::handleDrop(const std::string& newDrops)
 
   Json::Array dropped = (Json::Array)dropdata;
   for (std::size_t i = 0; i < dropped.size(); ++i) {
-    Json::Object upload = (Json::Object)dropped[i];
-    int id = -1;
-    ::uint64_t size = 0;
-    std::string name, type;
-    for (Json::Object::iterator it = upload.begin(); it != upload.end();
-         it++) {
-#ifndef WT_TARGET_JAVA
-      if (it->first == "id")
-        id = it->second;
-      else if (it->first == "filename")
-        name = (std::string)it->second;
-      else if (it->first == "type")
-        type = (std::string)it->second;
-      else if (it->first == "size")
-        size = (long long)it->second;
-#else
-      if (it->first == "id")
-        id = it->second.getAsInt();
-      else if (it->first == "filename")
-        name = it->second.getAsString();
-      else if (it->first == "type")
-        type = it->second.getAsString();
-      else if (it->first == "size")
-        size = it->second.getAsLong();
-#endif
-      else
-        throw std::exception();
-    }
+    Json::Object jsonObj = (Json::Object)dropped[i];
+    File* dropObject = addDropObject(jsonObj);
+    drops.push_back(dropObject);
+  }
 
-    auto file = std::make_unique<File>(id, name, type, size, chunkSize_);
-    drops.push_back(file.get());
+  // Convert the drop to a list of Files that need to be uploaded.
+  std::vector<File*> newUploads;
+  for (File *drop : drops) {
+    if (!drop->directory()) {
+      newUploads.push_back(drop);
+    } else {
+      std::vector<File*> dirUploads = flattenUploadsVector(dynamic_cast<Directory*>(drop));
+#ifndef WT_TARGET_JAVA
+      newUploads.insert(newUploads.end(), dirUploads.begin(), dirUploads.end());
+#else
+      for (auto dirEntry : dirUploads) {
+        newUploads.push_back(dirEntry);
+      }
+#endif
+    }
+  }
+
+  WStringStream ss;
+  ss << "[";
+  for (std::size_t i=0; i < newUploads.size(); ++i) {
+    ss << "{\"id\":" << newUploads[i]->uploadId() << "}";
+    if (i != newUploads.size()-1) {
+      ss << ",";
+    }
+  }
+  ss << "]";
+
+  dropEvent_.emit(drops);
+  doJavaScript(jsRef() + ".markForSending(" + ss.str() + ");");
+}
+
+WFileDropWidget::File* WFileDropWidget::addDropObject(const Json::Object& object) {
+  int id = -1;
+  ::uint64_t size = 0;
+  std::string name, type, path;
+  bool isDirectory = false;
+  Json::Array contents;
+  for (Json::Object::const_iterator it = object.begin(); it != object.end();
+       it++) {
+#ifndef WT_TARGET_JAVA
+    if (it->first == "id")
+      id = it->second;
+    else if (it->first == "filename")
+      name = (std::string)it->second;
+    else if (it->first == "path")
+      path = (std::string)it->second;
+    else if (it->first == "type")
+      type = (std::string)it->second;
+    else if (it->first == "size")
+      size = (long long)it->second;
+    else if (it->first == "contents") {
+      isDirectory = true;
+      contents = (Json::Array)it->second;
+    }
+#else
+    if (it->first == "id")
+      id = it->second.getAsInt();
+    else if (it->first == "filename")
+      name = it->second.getAsString();
+    else if (it->first == "path")
+      path = it->second.getAsString();
+    else if (it->first == "type")
+      type = it->second.getAsString();
+    else if (it->first == "size")
+      size = it->second.getAsLong();
+    else if (it->first == "contents") {
+      isDirectory = true;
+      for (Json::Value& contentsItem : it->second.getAsJsonArray()) {
+        contents.push_back(contentsItem);
+      }
+    }
+#endif
+    else
+      throw std::exception();
+  }
+
+  WFileDropWidget::File* retVal;
+  if (isDirectory) {
+    auto dir = std::make_unique<Directory>(name, path);
+#ifndef WT_TARGET_JAVA
+    for (Json::Object& dirItem : contents) {
+#else
+    for (Json::Value& dirItemValue : contents) {
+      Json::Object dirItem = dirItemValue.getAsJsonObject();
+#endif
+      dir->addFile(addDropObject(dirItem));
+    }
+    retVal = dir.get();
+    directories_.push_back(std::move(dir));
+  } else {
+    auto file = std::make_unique<File>(id, name, path, type, size, chunkSize_);
+    retVal = file.get();
     uploads_.push_back(std::move(file));
   }
-  dropEvent_.emit(drops);
-  doJavaScript(jsRef() + ".markForSending(" + newDrops + ");");
+  return retVal;
 }
 
 void WFileDropWidget::handleSendRequest(int id)
@@ -308,14 +418,13 @@ void WFileDropWidget::handleSendRequest(int id)
     if (uploads_[i]->uploadId() == id) {
       fileFound = true;
       currentFileIdx_ = i;
-      auto currentFile = uploads_[currentFileIdx_].get();
-      resource_ = std::make_unique<WFileDropUploadResource>(this, currentFile);
+      resource_ = uploadResource();
       resource_->dataReceived().connect(this, &WFileDropWidget::onData);
       resource_->dataExceeded().connect(this, &WFileDropWidget::onDataExceeded);
       doJavaScript(jsRef() + ".send('" + resource_->url() + "', "
-                   + (currentFile->filterEnabled() ? "true" : "false")
+                   + (currentFile()->filterEnabled() ? "true" : "false")
                    + ");");
-      uploadStart_.emit(currentFile);
+      uploadStart_.emit(currentFile());
       break;
     } else {
       // If a previous upload was not cancelled, it must have failed
@@ -332,6 +441,11 @@ void WFileDropWidget::handleSendRequest(int id)
   }
 }
 
+std::unique_ptr<WResource> WFileDropWidget::uploadResource()
+{
+  return std::make_unique<WFileDropUploadResource>(this, currentFile());
+}
+
 void WFileDropWidget::handleTooLarge(::uint64_t size)
 {
   if (currentFileIdx_ >= uploads_.size()) {
@@ -340,7 +454,7 @@ void WFileDropWidget::handleTooLarge(::uint64_t size)
     // to go out of bounds
     return;
   }
-  tooLarge_.emit(uploads_[currentFileIdx_].get(), size);
+  tooLarge_.emit(currentFile(), size);
   currentFileIdx_++;
 }
 
@@ -399,7 +513,7 @@ bool WFileDropWidget::incomingIdCheck(int id)
     // to go out of bounds
     return false;
   }
-  if (uploads_[currentFileIdx_]->uploadId() == id)
+  if (currentFile()->uploadId() == id)
     return true;
   else {
     return false;
@@ -408,21 +522,42 @@ bool WFileDropWidget::incomingIdCheck(int id)
 
 void WFileDropWidget::cancelUpload(File *file)
 {
-  file->cancel();
-  int i = file->uploadId();
-  doJavaScript(jsRef() + ".cancelUpload(" + std::to_string(i) + ");");
+  if (file->directory()) {
+    Directory *dir = dynamic_cast<Directory*>(file);
+    for (File *f : dir->contents()) {
+      cancelUpload(f);
+    }
+  } else {
+    file->cancel();
+    int i = file->uploadId();
+    doJavaScript(jsRef() + ".cancelUpload(" + std::to_string(i) + ");");
+  }
 }
 
 bool WFileDropWidget::remove(File *file)
 {
-  for (unsigned i=0; i < currentFileIdx_ && i < uploads_.size(); i++) {
-    if (uploads_[i].get() == file) {
-      uploads_.erase(uploads_.begin()+i);
-      currentFileIdx_--;
-      return true;
+  if (file->directory()) {
+    for (unsigned i=0; i < directories_.size(); i++) {
+      if (directories_[i].get() == file) {
+        directories_.erase(directories_.begin()+i);
+        return true;
+      }
+    }
+  } else {
+    for (unsigned i=0; i < currentFileIdx_ && i < uploads_.size(); i++) {
+      if (uploads_[i].get() == file) {
+        uploads_.erase(uploads_.begin()+i);
+        currentFileIdx_--;
+        return true;
+      }
     }
   }
   return false;
+}
+
+void WFileDropWidget::cleanDirectoryResources()
+{
+  directories_.clear();
 }
 
 void WFileDropWidget::onData(::uint64_t current, ::uint64_t total)
@@ -433,8 +568,7 @@ void WFileDropWidget::onData(::uint64_t current, ::uint64_t total)
     // to go out of bounds
     return;
   }
-  auto file = uploads_[currentFileIdx_].get();
-  file->emitDataReceived(current, total, filterSupported_);
+  currentFile()->emitDataReceived(current, total, filterSupported_);
 
   WApplication::instance()->triggerUpdate();
 }
@@ -447,7 +581,7 @@ void WFileDropWidget::onDataExceeded(::uint64_t dataExceeded)
     // to go out of bounds
     return;
   }
-  tooLarge_.emit(uploads_[currentFileIdx_].get(), dataExceeded);
+  tooLarge_.emit(currentFile(), dataExceeded);
 
   WApplication *app = WApplication::instance();
   app->triggerUpdate();
@@ -463,6 +597,9 @@ void WFileDropWidget::updateDom(DomElement& element, bool all)
     if (updateFlags_.test(BIT_ACCEPTDROPS_CHANGED) || all)
       doJavaScript(jsRef() + ".setAcceptDrops("
                    + (acceptDrops_ ? "true" : "false") + ");");
+      doJavaScript(jsRef() + ".setAcceptDirectories("
+                   + (acceptDirectories_ ? "true" : "false") + ", "
+                   + (acceptDirectoriesRecursive_ ? "true" : "false") + ");");
     if (updateFlags_.test(BIT_FILTERS_CHANGED) || all)
       doJavaScript(jsRef() + ".setFilters("
                    + jsStringLiteral(acceptAttributes_) + ");");
@@ -481,6 +618,17 @@ void WFileDropWidget::updateDom(DomElement& element, bool all)
                    + "\");");
       doJavaScript(jsRef() + ".setChunkSize("
                    + boost::lexical_cast<std::string>(chunkSize_) + ");");
+    }
+    if (updateFlags_.test(BIT_ONCLICKFILEPICKER_CHANGED) || all) {
+      std::string type = "file-selection";
+      if (onClickFilePicker_ == FilePickerType::None) {
+        type = "none";
+      } else if (onClickFilePicker_ == FilePickerType::DirectorySelection) {
+        type = "directory-selection";
+      } else if (onClickFilePicker_ != FilePickerType::FileSelection) {
+        LOG_WARN("Unknown FilePickerType, falling back to FileSelection.");
+      }
+      doJavaScript(jsRef() + ".setOnClickFilePicker(\"" + type + "\");");
     }
 
     updateFlags_.reset();
@@ -574,6 +722,55 @@ void WFileDropWidget::setJavaScriptFilter(const std::string& filterFn,
 
   updateFlags_.set(BIT_JSFILTER_CHANGED);
   repaint();
+}
+
+void WFileDropWidget::setAcceptDirectories(bool enable, bool recursive) {
+  acceptDirectories_ = enable;
+  acceptDirectoriesRecursive_ = recursive;
+  updateFlags_.set(BIT_ACCEPTDROPS_CHANGED);
+
+  if (!acceptDirectories_ && onClickFilePicker_ == FilePickerType::DirectorySelection) {
+    LOG_WARN("setAcceptDirectories: Reverting the onClickFilePicker to FileSelection since this widget no longer accepts directories.");
+    setOnClickFilePicker(FilePickerType::FileSelection);
+  }
+
+  repaint();
+}
+
+void WFileDropWidget::setOnClickFilePicker(FilePickerType type) {
+  if (onClickFilePicker_ == type)
+    return;
+
+  if (type == FilePickerType::DirectorySelection && !acceptDirectories_) {
+    LOG_ERROR("setOnClickFilePicker: Cannot configure directory filepicker because this widget does not accept directories.");
+    return;
+  }
+  onClickFilePicker_ = type;
+
+  updateFlags_.set(BIT_ONCLICKFILEPICKER_CHANGED);
+  repaint();
+}
+
+void WFileDropWidget::openFilePicker() {
+  if (!acceptDrops_) {
+    LOG_WARN("Not opening file picker since acceptDrop() is false.");
+    return;
+  }
+
+  wApp->doJavaScript(jsRef() + ".serverFileInput.click()");
+}
+
+void WFileDropWidget::openDirectoryPicker() {
+  if (!acceptDrops_) {
+    LOG_WARN("Not opening directory picker since acceptDrop() is false.");
+    return;
+  }
+  if (!acceptDirectories_) {
+    LOG_WARN("Not opening directory picker since acceptDirectories() is false.");
+    return;
+  }
+
+  wApp->doJavaScript(jsRef() + ".serverDirInput.click()");
 }
 
 void WFileDropWidget::createWorkerResource() {

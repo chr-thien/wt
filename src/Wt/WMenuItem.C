@@ -68,6 +68,8 @@ void WMenuItem::create(const std::string& iconPath, const WString& text,
   internalPathEnabled_ = true;
   closeable_ = false;
   selectable_ = true;
+  selectConnected_ = false;
+  menuItemCheckedConnected_ = false;
 
   text_ = nullptr;
   icon_ = nullptr;
@@ -308,6 +310,9 @@ void WMenuItem::setCheckable(bool checkable)
 
       WApplication *app = WApplication::instance();
       app->theme()->apply(this, checkBox_, MenuItemCheckBox);
+
+      signalsConnected_ = false;
+      repaint();
     } else {
       anchor()->removeWidget(checkBox_);
       checkBox_ = nullptr;
@@ -389,7 +394,9 @@ void WMenuItem::renderSelected(bool selected)
   } else {
     if (bs5Theme) {
       auto a = anchor();
-      a->toggleStyleClass(active, selected, true);
+      if (a) {
+        a->toggleStyleClass(active, selected, true);
+      }
     }
     toggleStyleClass(active, selected, true);
   }
@@ -442,18 +449,31 @@ void WMenuItem::connectSignals()
         checkBox_->checked().connect(this, &WMenuItem::setCheckBox);
         checkBox_->unChecked().connect(this, &WMenuItem::setUnCheckBox);
         selectFromCheckbox = true;
-      } else
+      } else {
         as = &a->clicked();
+      }
 
-      if (checkBox_)
+      if (checkBox_) {
         a->setLink(WLink());
+      }
 
-      if (uContents_)
+      if (uContents_) {
         as->connect(this, &WMenuItem::selectNotLoaded);
-      else {
-        as->connect(this, &WMenuItem::selectVisual);
-        if (!selectFromCheckbox)
+      } else {
+        if (!menuItemCheckedConnected_ && !selectConnected_) {
+          as->connect(this, &WMenuItem::selectVisual);
+        }
+        if (!selectFromCheckbox && !selectConnected_) {
           as->connect(this, &WMenuItem::select);
+          selectConnected_ = true;
+        } else if (selectFromCheckbox && !menuItemCheckedConnected_) {
+          /*  #12367: Fixes a bug where the checkbox of a menu item is not
+          *  clicked if the menu item itself is clicked, but the checkbox
+          *  or its label were not clicked. 
+          */
+          (&a->clicked())->connect(this, &WMenuItem::menuItemCheckedPropagate);
+          menuItemCheckedConnected_ = true;
+        }
       }
     }
   }
@@ -469,6 +489,17 @@ void WMenuItem::setUnCheckBox()
 {
   setChecked(false);
   select();
+}
+
+void WMenuItem::menuItemCheckedPropagate(){
+  if (isCheckable()) {
+    if (isChecked()){
+      checkBox_->unChecked().emit();
+    }
+    else{
+      checkBox_->checked().emit();
+    }
+  }
 }
 
 void WMenuItem::setParentMenu(WMenu *menu)

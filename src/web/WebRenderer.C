@@ -240,8 +240,7 @@ WebRenderer::AckState WebRenderer::ackUpdate(unsigned int updateId)
     return BadAck;
 }
 
-void WebRenderer::letReloadJS(WebResponse& response, bool newSession,
-                              bool embedded)
+void WebRenderer::letReloadJS(WebResponse& response, WT_MAYBE_UNUSED bool newSession, bool embedded)
 {
   if (!embedded) {
     addNoCacheHeaders(response);
@@ -258,7 +257,9 @@ void WebRenderer::letReloadHTML(WebResponse& response, bool newSession)
   addNoCacheHeaders(response);
   setHeaders(response, "text/html; charset=UTF-8");
 
-  response.out() << "<html><script type=\"text/javascript\">";
+  response.out() << "<html><script type=\"text/javascript\" nonce=\""
+                 << response.nonce()
+                 << "\">";
   letReloadJS(response, newSession, true);
   response.out() << "</script><body></body></html>";
 }
@@ -304,9 +305,10 @@ void WebRenderer::serveResponse(WebResponse& response)
   }
 }
 
-void WebRenderer::setPageVars(FileServe& page)
+void WebRenderer::setPageVars(FileServe& page, const std::string& nonce)
 {
   WApplication *app = session_.app();
+  Configuration& conf = session_.controller()->configuration();
 
   page.setVar("DOCTYPE", session_.docType());
 
@@ -349,6 +351,12 @@ void WebRenderer::setPageVars(FileServe& page)
   page.setCondition("FORM", !session_.env().agentIsSpiderBot()
                     && !session_.env().ajax());
   page.setCondition("BOOT_STYLE", true);
+
+  page.setCondition("USE_NONCE", conf.useScriptNonce());
+  page.setVar("NONCE", nonce);
+  if (conf.useScriptNonce() && nonce.empty()) {
+    LOG_WARN("An empty nonce has been defined. This may result in the CSP header not being correctly defined and used.");
+  }
 }
 
 void WebRenderer::streamBootContent(WebResponse& response,
@@ -390,6 +398,7 @@ void WebRenderer::streamBootContent(WebResponse& response,
     bootJs.setVar("APP_CLASS", "Wt");
     bootJs.setVar("PATH_INFO", safeJsStringLiteral
                   (session_.pagePathInfo_));
+    bootJs.setVar("DELAY_LOAD_AT_BOOT", conf.delayLoadAtBoot());
 
     bootJs.setCondition("COOKIE_CHECKS", conf.cookieChecks());
     bootJs.setCondition("HYBRID", hybrid);
@@ -455,7 +464,7 @@ void WebRenderer::serveBootstrap(WebResponse& response)
   Configuration& conf = session_.controller()->configuration();
 
   FileServe boot(skeletons::Boot_html);
-  setPageVars(boot);
+  setPageVars(boot, response.nonce());
 
   WStringStream noJsRedirectUrl;
   DomElement::htmlAttributeValue
@@ -479,7 +488,9 @@ void WebRenderer::serveBootstrap(WebResponse& response)
   boot.setVar("BOOT_STYLE_URL", bootStyleUrl.str());
 
   addNoCacheHeaders(response);
-  response.addHeader("X-Frame-Options", "SAMEORIGIN");
+  if (conf.useXFrameSameOrigin()) {
+    response.addHeader("X-Frame-Options", "SAMEORIGIN");
+  }
 
   std::string contentType = "text/html; charset=UTF-8";
 
@@ -937,7 +948,11 @@ void WebRenderer::serveMainscript(WebResponse& response)
   FileServe script(skeletons::Wt_js);
 
   script.setCondition
-    ("CATCH_ERROR", conf.errorReporting() != Configuration::NoErrors);
+    ("CATCH_ERROR", conf.errorReporting() != Configuration::NoErrors &&
+                    conf.clientSideErrorReportingLevel() == Configuration::Framework);
+  script.setCondition
+    ("CATCH_ALL_ERROR", conf.clientSideErrorReportingLevel() == Configuration::All &&
+                        conf.errorReporting() != Configuration::NoErrors);
   script.setCondition
     ("SHOW_ERROR", conf.errorReporting() == Configuration::ErrorMessage);
   script.setCondition
@@ -1475,6 +1490,10 @@ void WebRenderer::serveMainpage(WebResponse& response)
     std::string url = app->scriptLibraries_[i].uri;
     styleSheets << "<script src=";
     DomElement::htmlAttributeValue(styleSheets, session_.fixRelativeUrl(url));
+
+    if (conf.useScriptNonce()) {
+      styleSheets << " nonce=\"" << response.nonce() << "\"";
+    }
     styleSheets << "></script>\n";
 
     beforeLoadJS_ << app->scriptLibraries_[i].beforeLoadJS;
@@ -1486,7 +1505,7 @@ void WebRenderer::serveMainpage(WebResponse& response)
   bool hybridPage = session_.progressiveBoot() || session_.env().ajax();
   FileServe page(hybridPage ? skeletons::Hybrid_html : skeletons::Plain_html);
 
-  setPageVars(page);
+  setPageVars(page, response.nonce());
   page.setVar("SESSION_ID", session_.sessionId());
 
   std::string url
@@ -1515,7 +1534,9 @@ void WebRenderer::serveMainpage(WebResponse& response)
   std::string contentType = "text/html; charset=UTF-8";
 
   addNoCacheHeaders(response);
-  response.addHeader("X-Frame-Options", "SAMEORIGIN");
+  if (conf.useXFrameSameOrigin()) {
+    response.addHeader("X-Frame-Options", "SAMEORIGIN");
+  }
   setHeaders(response, contentType);
 
   currentFormObjectsList_ = createFormObjectsList(app);
@@ -1777,7 +1798,7 @@ void WebRenderer::collectJavaScriptUpdate(WStringStream& out)
   }
 }
 
-void WebRenderer::updateFormObjects(WWebWidget *source, bool checkDescendants)
+void WebRenderer::updateFormObjects(WT_MAYBE_UNUSED WWebWidget* source, WT_MAYBE_UNUSED bool checkDescendants)
 {
   formObjectsChanged_ = true;
 }

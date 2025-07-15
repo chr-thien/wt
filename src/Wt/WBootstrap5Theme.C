@@ -187,10 +187,8 @@ void WBootstrap5Theme::apply(WWidget *widget, WWidget *child, int widgetRole)
     auto app = WApplication::instance();
     auto iconPair = dynamic_cast<WIconPair *>(child);
     // this sets display: block, which makes sure the icons are aligned properly
-    iconPair->icon1()->setInline(false);
-    iconPair->icon1()->setImageLink(app->onePixelGifUrl());
-    iconPair->icon2()->setInline(false);
-    iconPair->icon2()->setImageLink(app->onePixelGifUrl());
+    iconPair->uriIcon1()->setInline(false);
+    iconPair->uriIcon2()->setInline(false);
     iconPair->addStyleClass("Wt-collapse-button");
     break;
   }
@@ -258,12 +256,17 @@ void WBootstrap5Theme::apply(WWidget *widget, DomElement& element,
   switch (element.type()) {
 
   case DomElementType::A: {
-    if (creating && dynamic_cast<WPushButton *>(widget))
-      element.addPropertyWord(Property::Class, classBtn(widget));
-
     auto btn = dynamic_cast<WPushButton *>(widget);
-    if (creating && btn && btn->isDefault())
-      element.addPropertyWord(Property::Class, "btn-primary");
+
+    if (btn) {
+      if (creating) {
+        element.addPropertyWord(Property::Class, classBtn(widget));
+        if (btn->isDefault()) {
+          element.addPropertyWord(Property::Class, "btn-primary");
+        }
+      }
+      break;
+    }
 
     auto item = dynamic_cast<WMenuItem *>(widget->parent());
     if (item) {
@@ -416,13 +419,13 @@ void WBootstrap5Theme::apply(WWidget *widget, DomElement& element,
     }
 
     auto dateEdit = dynamic_cast<WDateEdit *>(widget);
-    if (dateEdit) {
+    if (dateEdit && !dateEdit->nativeControl()) {
       element.addPropertyWord(Property::Class, "Wt-dateedit");
       return;
     }
 
     auto timeEdit = dynamic_cast<WTimeEdit *>(widget);
-    if (timeEdit) {
+    if (timeEdit && !timeEdit->nativeControl()) {
       element.addPropertyWord(Property::Class, "Wt-timeedit");
       return;
     }
@@ -451,10 +454,12 @@ void WBootstrap5Theme::apply(WWidget *widget, DomElement& element,
         if (element.getProperty(Property::Class).find("navbar-nav") == std::string::npos)
           element.addPropertyWord(Property::Class, "nav");
 
-        auto tabs = dynamic_cast<WTabWidget *>(menu->parent()->parent());
+        if (menu->parent()) {
+          auto tabs = dynamic_cast<WTabWidget *>(menu->parent()->parent());
 
-        if (tabs)
-          element.addPropertyWord(Property::Class, "nav-tabs");
+          if (tabs)
+            element.addPropertyWord(Property::Class, "nav-tabs");
+        }
       } else {
         auto suggestions = dynamic_cast<WSuggestionPopup *>(widget);
 
@@ -542,8 +547,7 @@ void WBootstrap5Theme::applyValidationStyle(WWidget *widget,
     js << WT_CLASS ".setValidationState(" << widget->jsRef() << ","
        << (validation.state() == ValidationState::Valid) << ","
        << validation.message().jsStringLiteral() << ","
-       << styles.value() << ","
-       << "'is-valid', 'is-invalid');";
+       << styles.value() << ");";
 
     widget->doJavaScript(js.str());
   } else {
@@ -559,7 +563,7 @@ void WBootstrap5Theme::applyValidationStyle(WWidget *widget,
   }
 }
 
-bool WBootstrap5Theme::canBorderBoxElement(const DomElement& element) const
+bool WBootstrap5Theme::canBorderBoxElement(WT_MAYBE_UNUSED const DomElement& element) const
 {
   // Irrelevant, is used for old IE versions
   return true;

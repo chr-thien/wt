@@ -23,32 +23,34 @@ public:
   FlexLayoutImpl(WLayout *layout, Impl::Grid& grid);
   virtual ~FlexLayoutImpl();
 
-  virtual int minimumWidth() const override;
-  virtual int minimumHeight() const override;
+  int minimumWidth() const override;
+  int minimumHeight() const override;
+  int maximumWidth() const override;
+  int maximumHeight() const override;
 
-  virtual void itemAdded(WLayoutItem *) override;
-  virtual void itemRemoved(WLayoutItem *) override;
+  void itemAdded(WLayoutItem *) override;
+  void itemRemoved(WLayoutItem *) override;
 
-  virtual void updateDom(DomElement& parent) override;
+  void updateDom(DomElement& parent) override;
 
-  virtual void update() override;
+  DomElement *createDomElement(DomElement *parent, bool fitWidth,
+                               bool fitHeight, WApplication *app) override;
 
-  virtual DomElement *createDomElement(DomElement *parent,
-                                       bool fitWidth, bool fitHeight,
-                                       WApplication *app) override;
-
-  virtual bool itemResized(WLayoutItem *item) override;
-  virtual bool parentResized() override;
+  bool itemResized(WLayoutItem *item) override;
+  bool parentResized() override;
 
 private:
   Impl::Grid& grid_;
   std::vector<WLayoutItem *> addedItems_;
   std::vector<std::string> removedItems_;
   std::string elId_;
+  bool canAdjustLayout_;
 
   int minimumHeightForRow(int row) const;
   int minimumWidthForColumn(int column) const;
-  DomElement *createElement(Orientation orientation, unsigned index,
+  int maximumHeightForRow(int row) const;
+  int maximumWidthForColumn(int column) const;
+  DomElement *createElement(Orientation orientation, int index,
                             int totalStretch, WApplication *app);
   Orientation getOrientation() const;
   LayoutDirection getDirection() const;

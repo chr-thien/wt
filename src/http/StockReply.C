@@ -272,8 +272,9 @@ void buildOriginalURL(Request &req, std::string &url)
 
 StockReply::StockReply(Request& request,
                        status_type status,
-                       const Configuration& configuration)
-  : Reply(request, configuration),
+                       const Configuration& configuration,
+                       const Wt::Configuration* wtConfig)
+  : Reply(request, configuration, wtConfig),
     transmitted_(false)
 {
   setStatus(status);
@@ -282,22 +283,21 @@ StockReply::StockReply(Request& request,
 StockReply::StockReply(Request& request,
                        status_type status,
                        std::string extraContent,
-                       const Configuration& configuration)
-  : Reply(request, configuration),
+                       const Configuration& configuration,
+                       const Wt::Configuration* wtConfig)
+  : Reply(request, configuration, wtConfig),
     content_(extraContent),
     transmitted_(false)
 {
   setStatus(status);
 }
 
-void StockReply::reset(const Wt::EntryPoint *ep)
+void StockReply::reset(WT_MAYBE_UNUSED const Wt::EntryPoint* ep)
 {
   assert(false);
 }
 
-bool StockReply::consumeData(const char *begin,
-                             const char *end,
-                             Request::State state)
+bool StockReply::consumeData(WT_MAYBE_UNUSED const char* begin, WT_MAYBE_UNUSED const char* end, Request::State state)
 {
   if (state != Request::Partial)
     send();

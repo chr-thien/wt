@@ -21,6 +21,7 @@
   _$_WS_PATH_$_
   _$_WT_CLASS_$_
   _$_$if_CATCH_ERROR_$_
+  _$_$if_CATCH_ALL_ERROR_$_
   _$_$if_DYNAMIC_JS_$_
   _$_$ifnot_DYNAMIC_JS_$_
   _$_$if_SHOW_ERROR_$_
@@ -1352,12 +1353,21 @@ if (!window._$_WT_CLASS_$_) {
     };
     this.inline = function(o) {
       WT.getElement(o).style.display = "inline";
+      if (window.currentApp && window.currentApp.layouts2) {
+        window.currentApp.layouts2.scheduleAdjust();
+      }
     };
     this.block = function(o) {
       WT.getElement(o).style.display = "block";
+      if (window.currentApp && window.currentApp.layouts2) {
+        window.currentApp.layouts2.scheduleAdjust();
+      }
     };
     this.show = function(o, s) {
       WT.getElement(o).style.display = s;
+      if (window.currentApp && window.currentApp.layouts2) {
+        window.currentApp.layouts2.scheduleAdjust();
+      }
     };
 
     let captureElement = null;
@@ -1760,7 +1770,7 @@ if (!window._$_WT_CLASS_$_) {
      * position right to (x) or left from (rightx) and
      * bottom of (y) or top from (bottomy)
      */
-    this.fitToWindow = function(e, x, y, rightx, bottomy) {
+    this.fitToWindow = function(e, x, y, rightx, bottomy, adjustX = true, adjustY = true) {
       const hsides = ["left", "right"],
         vsides = ["top", "bottom"];
 
@@ -1792,12 +1802,15 @@ if (!window._$_WT_CLASS_$_) {
 
       const offsetParent = WT.widgetPageCoordinates(op);
 
-      if (reserveWidth > windowSize.x) {
-        // wider than window
-        x = windowX;
-        hside = 0;
-      } else if (x + reserveWidth > windowX + windowSize.x) {
+      if (x + reserveWidth > windowX + windowSize.x) {
         // too far right, chose other side
+        if (adjustX && reserveWidth > rightx - windowX) {
+          /*
+           * Too large to be displayed from the left starting from the
+           * current rightx, and can be displayed between x and rightx
+           */
+          rightx = windowX + reserveWidth;
+        }
         let scrollX = op.scrollLeft;
         if (op === document.body) {
           scrollX = op.clientWidth - windowSize.x;
@@ -1815,14 +1828,18 @@ if (!window._$_WT_CLASS_$_) {
         hside = 0;
       }
 
-      if (reserveHeight > windowSize.y) {
-        // taller than window
-        y = windowY;
-        vside = 0;
-      } else if (y + reserveHeight > windowY + windowSize.y) {
+      if (y + reserveHeight > windowY + windowSize.y) {
         // too far below, chose other side
         if (bottomy > windowY + windowSize.y) {
+          // requested bottom edge is already off screen
           bottomy = windowY + windowSize.y;
+        }
+        if (adjustY && reserveHeight > bottomy - windowY) {
+          /*
+           * Too tall to be displayed upwards starting from the current
+           * bottomy, and can be displayed between y and bottomy
+           */
+          bottomy = windowY + reserveHeight;
         }
         let scrollY = op.scrollTop;
         if (op === document.body) {
@@ -1853,19 +1870,19 @@ if (!window._$_WT_CLASS_$_) {
       e.style[vsides[vside]] = y + "px";
     };
 
-    this.positionXY = function(id, x, y) {
+    this.positionXY = function(id, x, y, adjustX = true, adjustY = true) {
       const w = WT.getElement(id);
 
       if (!WT.isHidden(w)) {
         w.style.display = "block";
-        WT.fitToWindow(w, x, y, x, y);
+        WT.fitToWindow(w, x, y, x, y, adjustX, adjustY);
       }
     };
 
     this.Horizontal = 0x1;
     this.Vertical = 0x2;
 
-    this.positionAtWidget = function(id, atId, orientation, delta) {
+    this.positionAtWidget = function(id, atId, orientation, delta, adjustX = true, adjustY = true) {
       const w = WT.getElement(id),
         atw = WT.getElement(atId);
 
@@ -1942,7 +1959,7 @@ if (!window._$_WT_CLASS_$_) {
       p.appendChild(w);
       w.classList.add("wt-reparented");
 
-      WT.fitToWindow(w, x, y, rightx, bottomy);
+      WT.fitToWindow(w, x, y, rightx, bottomy, adjustX, adjustY);
 
       w.style.visibility = "";
     };
@@ -2125,7 +2142,7 @@ if (!window._$_WT_CLASS_$_) {
               newState = stateMap[w.location.pathname + w.location.search];
             }
 
-            if (newState === null) {
+            if (newState === null || typeof newState === UNDEFINED) {
               const endw = w.location.pathname.lastIndexOf(currentState);
               if (
                 endw !== -1 &&
@@ -2244,8 +2261,10 @@ if (!window._$_WT_CLASS_$_) {
 
     this.maxZIndex = function() {
       let maxz = 0;
+      let tempMax = 0;
       document.querySelectorAll(".Wt-dialog, .modal, .modal-dialog").forEach(function(elem) {
-        maxz = Math.max(maxz, WT.css(elem, "z-index"));
+        tempMax = Math.max(maxz, WT.css(elem, "z-index"));
+        maxz = isNaN(tempMax) ? maxz : tempMax;
       });
 
       return maxz;
@@ -3169,7 +3188,7 @@ window._$_APP_CLASS_$_ = new (function() {
     }
 
     if (comm) {
-      comm.setUrl(url);
+      comm.setUrl(sessionUrl);
     }
   }
 
@@ -3559,9 +3578,17 @@ window._$_APP_CLASS_$_ = new (function() {
       }
 
       const eventsData = encodePendingEvents(maxEventsSize);
-      tm = eventsData.feedback ?
-        setTimeout(useWebSockets ? wsWaitFeedback : waitFeedback, _$_INDICATOR_TIMEOUT_$_) :
-        null;
+
+      if (eventsData.feedback && _$_INDICATOR_TIMEOUT_$_ === 0) {
+        if (!useWebSockets) {
+          waitFeedback();
+        }
+        tm = Date.now(); // we need a unique id for when we use websocket
+      } else {
+        tm = eventsData.feedback ?
+          setTimeout(useWebSockets ? wsWaitFeedback : waitFeedback, _$_INDICATOR_TIMEOUT_$_) :
+          null;
+      }
       data += eventsData.result;
       poll = false;
     } else {
@@ -3579,6 +3606,10 @@ window._$_APP_CLASS_$_ = new (function() {
           pendingWsRequests[wsRqId] = { time: Date.now(), tm: tm };
           ++nextWsRqId;
           data += "&wsRqId=" + wsRqId;
+
+          if (_$_INDICATOR_TIMEOUT_$_ === 0) {
+            wsWaitFeedback();
+          }
         }
 
         websocket.socket.send(data);
@@ -4060,6 +4091,25 @@ window._$_APP_CLASS_$_ = new (function() {
       }
     }
   }
+
+  _$_$if_CATCH_ALL_ERROR_$_();
+  window.onerror = function(message, source, lineno, colno, error) {
+    let code;
+    const err = { "exception_code": code, "exception_description": message };
+    if (typeof error !== "undefined") {
+      code = error.code;
+      err.stack = error.stack || error.stacktrace;
+    }
+
+    const codeStr = code === null ? "" : "code: " + code + ", ";
+    sendError(
+      err,
+      "JavaScript error; " + codeStr +
+        "description: " + message
+    );
+    return false;
+  };
+  _$_$endif_$_();
 
   this._p_ = {
     ieAlternative,

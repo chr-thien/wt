@@ -28,11 +28,7 @@ namespace Wt {
   LOGGER("wthttp/async");
 }
 
-#if BOOST_VERSION >= 104900
 typedef std::chrono::seconds asio_timer_seconds;
-#else
-typedef boost::posix_time::seconds asio_timer_seconds;
-#endif
 
 namespace http {
 namespace server {
@@ -46,6 +42,7 @@ Connection::Connection(asio::io_service& io_service, Server *server,
   : ConnectionManager_(manager),
     strand_(io_service),
     state_(Idle),
+    socketTransferRequested_(false),
     request_handler_(handler),
     readTimer_(io_service),
     writeTimer_(io_service),
@@ -61,17 +58,10 @@ Connection::~Connection()
   LOG_DEBUG("~Connection");
 }
 
-#if (defined(WT_ASIO_IS_BOOST_ASIO) && BOOST_VERSION >= 106600) || (defined(WT_ASIO_IS_STANDALONE_ASIO) && ASIO_VERSION >= 101100)
 asio::ip::tcp::socket::native_handle_type Connection::native()
 {
   return socket().native_handle();
 }
-#else
-asio::ip::tcp::socket::native_type Connection::native()
-{
-  return socket().native();
-}
-#endif
 
 void Connection::finishReply()
 {
@@ -84,8 +74,8 @@ void Connection::finishReply()
 
 void Connection::scheduleStop()
 {
-  server_->service()
-    .post(strand_.wrap(std::bind(&Connection::stop, shared_from_this())));
+  asio::post(server_->service(),
+             strand_.wrap(std::bind(&Connection::stop, shared_from_this())));
 }
 
 void Connection::start()
@@ -113,6 +103,11 @@ void Connection::stop()
   lastWtReply_.reset();
   lastProxyReply_.reset();
   lastStaticReply_.reset();
+  if (socketTransferRequested_) {
+    request_parser_.reset();
+    request_.reset();
+    rcv_buffers_.clear();
+  }
 }
 
 void Connection::setReadTimeout(int seconds)
@@ -122,7 +117,7 @@ void Connection::setReadTimeout(int seconds)
               << request_.webSocketVersion << ")");
     state_ |= Reading;
 
-    readTimer_.expires_from_now(asio_timer_seconds(seconds));
+    readTimer_.expires_after(asio_timer_seconds(seconds));
     readTimer_.async_wait(std::bind(&Connection::timeout, shared_from_this(),
                                     std::placeholders::_1));
   }
@@ -134,7 +129,7 @@ void Connection::setWriteTimeout(int seconds)
             << request_.webSocketVersion << ")");
   state_ |= Writing;
 
-  writeTimer_.expires_from_now(asio_timer_seconds(seconds));
+  writeTimer_.expires_after(asio_timer_seconds(seconds));
   writeTimer_.async_wait(std::bind(&Connection::timeout, shared_from_this(),
                                    std::placeholders::_1));
 }
@@ -157,8 +152,9 @@ void Connection::cancelWriteTimer()
 
 void Connection::timeout(const Wt::AsioWrapper::error_code& e)
 {
-  if (e != asio::error::operation_aborted)
-    strand_.post(std::bind(&Connection::doTimeout, shared_from_this()));
+  if (e != asio::error::operation_aborted) {
+    asio::post(strand_, std::bind(&Connection::doTimeout, shared_from_this()));
+  }
 }
 
 void Connection::doTimeout()
@@ -168,6 +164,20 @@ void Connection::doTimeout()
   readTimer_.cancel();
   writeTimer_.cancel();
 }
+
+void Connection::requestTcpSocketTransfer(const std::function<void(std::unique_ptr<asio::ip::tcp::socket>)>& callback)
+{
+  socketTransferRequested_ = true;
+  tcpSocketTransferCallback_ = callback;
+}
+
+#ifdef HTTP_WITH_SSL
+void Connection::requestSslSocketTransfer(const std::function<void(std::unique_ptr<asio::ssl::stream<asio::ip::tcp::socket>>)>& callback)
+{
+  socketTransferRequested_ = true;
+  sslSocketTransferCallback_ = callback;
+}
+#endif
 
 void Connection::handleReadRequest0()
 {
@@ -194,12 +204,18 @@ void Connection::handleReadRequest0()
   if (result) {
     Reply::status_type status = request_parser_.validate(request_);
     // FIXME: Let the reply decide whether we're doing websockets, move this logic to WtReply
-    bool doWebSockets = server_->controller()->configuration().webSockets() &&
-                        (server_->controller()->configuration().sessionPolicy() != Wt::Configuration::DedicatedProcess ||
-                         server_->configuration().parentPort() != -1);
+    bool doWebSockets = server_->controller()->configuration().webSockets();
 
-    if (doWebSockets)
-      request_.enableWebSocket();
+    // Enables websockets if applicable (i.e. right protocol is used and version is fitting (13)).
+    // This has a side-effect, that when using dedicated sessions, the connection between the "proxy"
+    // (the main process) and client (the subprocess) will be upgraded as well, which should NOT happen.
+    //
+    // This is rectified later, after parsing the message.
+    request_.enableWebSocket();
+    if ((request_.type == Request::WebSocket || request_.webSocketVersion >= 0) && !doWebSockets) {
+      // A websocket request was sent, but websockets are disabled by config
+      status = Reply::bad_request;
+    }
 
     LOG_DEBUG(native() << "request: " << status);
 
@@ -220,6 +236,16 @@ void Connection::handleReadRequest0()
         reply = request_handler_.handleRequest
           (request_, lastWtReply_, lastProxyReply_, lastStaticReply_);
         reply->setConnection(shared_from_this());
+
+        // For a WebSocket message, we are either in the case of the actual process that
+        // manages the connection, or we are on the "proxy" that passes the information to the right child process.
+        // In the latter case, we do not actually need to "execute" the logic for the request. This can
+        // be avoided by resetting the request's WebSocket version and type. Otherwise this would create a
+        // WebSocket connection between the client and parent, which is not necessary.
+        if (!lastWtReply_ && lastProxyReply_) {
+          request_.webSocketVersion = -1;
+          request_.type = Request::HTTP;
+        }
       } catch (Wt::AsioWrapper::system_error& e) {
         LOG_ERROR("Error in handleRequest0(): " << e.what());
         handleError(e.code());
@@ -243,7 +269,7 @@ void Connection::handleReadRequest0()
 void Connection::sendStockReply(StockReply::status_type status)
 {
   ReplyPtr reply
-    (new StockReply(request_, status, "", server_->configuration()));
+    (new StockReply(request_, status, "", server_->configuration(), request_handler_.wtConfig()));
 
   reply->setConnection(shared_from_this());
   reply->setCloseConnection();
@@ -284,7 +310,7 @@ bool Connection::closed() const
   return !self->socket().is_open();
 }
 
-void Connection::handleError(const Wt::AsioWrapper::error_code& e)
+void Connection::handleError(WT_MAYBE_UNUSED const Wt::AsioWrapper::error_code& e)
 {
   LOG_DEBUG(native() << ": error: " << e.message());
 
@@ -338,8 +364,8 @@ bool Connection::readAvailable()
 void Connection::detectDisconnect(ReplyPtr reply,
                                   const std::function<void()>& callback)
 {
-  server_->service()
-    .post(strand_.wrap(std::bind(&Connection::asyncDetectDisconnect, this, reply, callback)));
+  asio::post(server_->service(),
+             strand_.wrap(std::bind(&Connection::asyncDetectDisconnect, this, reply, callback)));
 }
 
 void Connection::asyncDetectDisconnect(ReplyPtr reply,
@@ -401,15 +427,15 @@ void Connection::startWriteResponse(ReplyPtr reply)
   if (state_ & Writing) {
     LOG_ERROR("Connection::startWriteResponse(): connection already writing");
     close();
-    server_->service()
-      .post(strand_.wrap(std::bind(&Reply::writeDone, reply, false)));
+    asio::post(server_->service(),
+               strand_.wrap(std::bind(&Reply::writeDone, reply, false)));
     return;
   }
 
   std::vector<asio::const_buffer> buffers;
   responseDone_ = reply->nextBuffers(buffers);
 
-  unsigned s = 0;
+  WT_MAYBE_UNUSED unsigned s = 0;
 #ifdef DEBUG
   for (unsigned i = 0; i < buffers.size(); ++i) {
     int size = asio::buffer_size(buffers[i]);
@@ -447,7 +473,10 @@ void Connection::handleWriteResponse(ReplyPtr reply)
     } else {
       reply->logReply(request_handler_.logger());
 
-      if (reply->closeConnection())
+      if (socketTransferRequested_) {
+        doSocketTransferCallback();
+        ConnectionManager_.stop(shared_from_this());
+      } else if (reply->closeConnection())
         ConnectionManager_.stop(shared_from_this());
       else {
         request_parser_.reset();
@@ -468,7 +497,7 @@ void Connection::handleWriteResponse(ReplyPtr reply)
 
 void Connection::handleWriteResponse0(ReplyPtr reply,
                                       const Wt::AsioWrapper::error_code& e,
-                                      std::size_t bytes_transferred)
+                                      WT_MAYBE_UNUSED std::size_t bytes_transferred)
 {
   LOG_DEBUG(native() << ": handleWriteResponse0(): "
             << bytes_transferred << " ; " << e.message());

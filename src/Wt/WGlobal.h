@@ -140,6 +140,8 @@ namespace Wt {
   class WPainter;
   class WPainterPath;
   class WPanel;
+  class WPasswordEdit;
+  class WPasswordValidator;
   class WPdfImage;
   class WPen;
   class WPoint;
@@ -149,6 +151,7 @@ namespace Wt {
   class WPopupWidget;
   class WProgressBar;
   class WPushButton;
+  class WQrCode;
   class WRadioButton;
   class WRandom;
   class WReadOnlyProxyModel;
@@ -167,6 +170,7 @@ namespace Wt {
   class WSound;
   class WSpinBox;
   class WSplitButton;
+  class WStackedValidator;
   class WStackedWidget;
   class WStandardItem;
   class WStandardItemModel;
@@ -248,6 +252,13 @@ namespace Wt {
       class Widget;
     }
 #endif // WT_HAS_SAML
+
+    namespace Mfa {
+      class AbstractMfaProcess;
+      class AuthenticationResult;
+      class TotpProcess;
+      class TotpQrCode;
+    }
   }
 
   namespace Chart {
@@ -341,6 +352,9 @@ enum class Orientation {
 };
 
 W_DECLARE_OPERATORS_FOR_FLAGS(Orientation)
+
+static const WFlags<Orientation> AllOrientations =
+  Orientation::Horizontal | Orientation::Vertical;
 
 /*! \brief Enumeration that indicates a standard button.
  *

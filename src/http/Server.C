@@ -122,11 +122,7 @@ Server::Server(const Configuration& config, Wt::WServer& wtServer)
     accept_strand_(wt_.ioService()),
     // post_strand_(ioService_),
 #ifdef HTTP_WITH_SSL
-#if (defined(WT_ASIO_IS_BOOST_ASIO) && BOOST_VERSION >= 106600) || (defined(WT_ASIO_IS_STANDALONE_ASIO) && ASIO_VERSION >= 101100)
     ssl_context_(asio::ssl::context::sslv23),
-#else
-    ssl_context_(wt_.ioService(), asio::ssl::context::sslv23),
-#endif
 #endif // HTTP_WITH_SSL
     connection_manager_(),
     sessionManager_(0),
@@ -135,12 +131,11 @@ Server::Server(const Configuration& config, Wt::WServer& wtServer)
 {
   if (config.parentPort() != -1) {
     accessLogger_.configure(std::string("-*"));
-  } else if (config.accessLog().empty())
-    accessLogger_.setStream(std::cout);
-  else if (config.accessLog() == "-")
+  } else if (config.accessLog() == "-") {
     accessLogger_.configure(std::string("-*"));
-  else
+  } else if (!config.accessLog().empty()) {
     accessLogger_.setFile(config.accessLog());
+  }
 
   if (wt_.configuration().sessionPolicy() == Wt::Configuration::DedicatedProcess &&
       config.parentPort() == -1) {
@@ -148,13 +143,11 @@ Server::Server(const Configuration& config, Wt::WServer& wtServer)
     request_handler_.setSessionManager(sessionManager_);
   }
 
-  accessLogger_.addField("remotehost", false);
-  accessLogger_.addField("rfc931", false);
-  accessLogger_.addField("authuser", false);
-  accessLogger_.addField("date", false);
-  accessLogger_.addField("request", true);
-  accessLogger_.addField("status", false);
-  accessLogger_.addField("bytes", false);
+  accessLogger_.addField("datetime", false);
+  accessLogger_.addField("app", false);
+  accessLogger_.addField("session", false);
+  accessLogger_.addField("type", false);
+  accessLogger_.addField("message", true);
 
   start();
 }
@@ -175,7 +168,7 @@ void Server::start()
       config_.parentPort() != -1) {
     // If we have one shared process, or this is the only session process,
     // run expireSessions() every SESSION_EXPIRE_INTERVAL seconds
-    expireSessionsTimer_.expires_from_now
+    expireSessionsTimer_.expires_after
       (std::chrono::seconds(SESSION_EXPIRE_INTERVAL));
     expireSessionsTimer_.async_wait
       (std::bind(&Server::expireSessions, this, std::placeholders::_1));
@@ -220,10 +213,7 @@ void Server::start()
       sslOptions |= asio::ssl::context::no_sslv3;
 
     sslOptions |= asio::ssl::context::no_tlsv1;
-#if (defined(WT_ASIO_IS_BOOST_ASIO) && BOOST_VERSION >= 105800) || \
-     defined(WT_ASIO_IS_STANDALONE_ASIO)
     sslOptions |= asio::ssl::context::no_tlsv1_1;
-#endif
 
     ssl_context_.set_options(sslOptions);
 
@@ -312,7 +302,7 @@ std::vector<asio::ip::address> Server::resolveAddress(asio::ip::tcp::resolver &r
 {
   std::vector<asio::ip::address> result;
   Wt::AsioWrapper::error_code errc;
-  asio::ip::address fromStr = asio::ip::address::from_string(address, errc);
+  asio::ip::address fromStr = asio::ip::make_address(address, errc);
   if (!errc) {
     // The address is not a hostname, because it can be parsed as an
     // IP address, so we don't need to resolve it
@@ -321,20 +311,17 @@ std::vector<asio::ip::address> Server::resolveAddress(asio::ip::tcp::resolver &r
   } else {
 #ifndef NO_RESOLVE_ACCEPT_ADDRESS
     // Resolve IPv4
-    asio::ip::tcp::resolver::query query(asio::ip::tcp::v4(), address, "http");
-    asio::ip::tcp::resolver::iterator end;
-    for (asio::ip::tcp::resolver::iterator it = resolver.resolve(query, errc);
-         !errc && it != end; ++it) {
-      result.push_back(it->endpoint().address());
+    auto endpoints = resolver.resolve(asio::ip::tcp::v4(), address, "http", errc);
+    for (auto it : endpoints) {
+      result.push_back(it.endpoint().address());
     }
     if (errc)
       LOG_DEBUG_S(&wt_, "Failed to resolve hostname \"" << address << "\" as IPv4: " <<
                   Wt::AsioWrapper::system_error(errc).what());
     // Resolve IPv6
-    query = Wt::AsioWrapper::asio::ip::tcp::resolver::query(Wt::AsioWrapper::asio::ip::tcp::v6(), address, "http");
-    for (Wt::AsioWrapper::asio::ip::tcp::resolver::iterator it = resolver.resolve(query, errc);
-         !errc && it != end; ++it) {
-      result.push_back(it->endpoint().address());
+    endpoints = resolver.resolve(asio::ip::tcp::v6(), address, "http", errc);
+    for (auto it : endpoints) {
+      result.push_back(it.endpoint().address());
     }
     if (errc)
       LOG_DEBUG_S(&wt_, "Failed to resolve hostname \"" << address << "\" as IPv6: " <<
@@ -553,7 +540,7 @@ void Server
 }
 
 void Server
-::handleMessageSent(const std::shared_ptr<std::string>& buf,
+::handleMessageSent(WT_MAYBE_UNUSED const std::shared_ptr<std::string>& buf,
                     const Wt::AsioWrapper::error_code& err)
 {
   if (err) {
@@ -568,7 +555,8 @@ void Server::closeParentConnection()
   if (parentSocket_->is_open()) {
     Wt::AsioWrapper::error_code ignored_ec;
     parentSocket_->shutdown(asio::ip::tcp::socket::shutdown_both, ignored_ec);
-    parentSocket_->close();
+    parentSocket_->cancel(ignored_ec);
+    parentSocket_->close(ignored_ec);
   }
 }
 
@@ -692,7 +680,7 @@ void Server::expireSessions(Wt::AsioWrapper::error_code ec)
         config_.parentPort() != -1)
       wt_.scheduleStop();
     else {
-      expireSessionsTimer_.expires_from_now
+      expireSessionsTimer_.expires_after
         (std::chrono::seconds(SESSION_EXPIRE_INTERVAL));
       expireSessionsTimer_.async_wait
         (std::bind(&Server::expireSessions, this, std::placeholders::_1));

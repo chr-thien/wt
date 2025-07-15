@@ -24,6 +24,12 @@ public:
   explicit WVector3(double *d);
   WVector3(double x, double y, double z);
 
+  //! Destructor
+  ~WVector3() = default;
+
+  //! Copy assignment operator
+  WVector3&  operator=(const WVector3& other);
+
   const double &x() const;
   const double &y() const;
   const double &z() const;

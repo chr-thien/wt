@@ -8,10 +8,13 @@
 #include "Wt/WLocale.h"
 #include "Wt/WLogger.h"
 #include "Wt/WDateTime.h"
+#include "Wt/Utils.h"
 
 #include "WebRequest.h"
 #include "WebUtils.h"
 #include "Configuration.h"
+
+#include "Wt/Auth/AuthUtils.h"
 
 #include <cstdlib>
 
@@ -122,7 +125,7 @@ void WebRequest::reset()
   urlParams_.clear();
 }
 
-void WebRequest::readWebSocketMessage(const ReadCallback& callback)
+void WebRequest::readWebSocketMessage(WT_MAYBE_UNUSED const ReadCallback& callback)
 {
   throw WException("should not get here");
 }
@@ -132,7 +135,23 @@ bool WebRequest::webSocketMessagePending() const
   throw WException("should not get here");
 }
 
-bool WebRequest::detectDisconnect(const DisconnectCallback& callback)
+void WebRequest::setTransferWebSocketResourceSocketCallBack(WebSocketResourceTransferCallback cb)
+{
+  wsResourceTransferCb_ = cb;
+}
+
+bool WebRequest::hasTransferWebSocketResourceSocketCallBack()
+{
+  return wsResourceTransferCb_ != nullptr;
+}
+
+void WebRequest::transferWebSocketResourceSocket(const std::shared_ptr<WebSocketConnection> &socket)
+{
+  Wt::Http::Request request(*this, nullptr);
+  wsResourceTransferCb_(request, socket);
+}
+
+bool WebRequest::detectDisconnect(WT_MAYBE_UNUSED const DisconnectCallback& callback)
 {
   return false; /* Not implemented */
 }
@@ -474,6 +493,12 @@ std::string WebRequest::urlScheme(const Configuration &conf) const
   }
 
   return urlScheme();
+}
+
+void WebRequest::addNonce()
+{
+  nonce_ = Utils::base64Encode(Auth::Utils::createSalt(18), false);
+  addHeader("Content-Security-Policy", "script-src 'nonce-"+nonce()+"' 'strict-dynamic' 'unsafe-eval'");
 }
 
 }

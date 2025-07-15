@@ -23,6 +23,7 @@ namespace boost {
 
 #include <Wt/WObject.h>
 #include <Wt/WCssStyleSheet.h>
+#include <Wt/WEnvironment.h>
 #include <Wt/WEvent.h>
 #include <Wt/WJavaScriptPreamble.h>
 #include <Wt/WJavaScriptSlot.h>
@@ -51,11 +52,15 @@ class WLoadingIndicator;
 class WLogEntry;
 class WResource;
 class WText;
+#ifndef WT_TARGET_JAVA
+class WWebSocketResource;
+#endif // WT_TARGET_JAVA
 
 class WebSession;
 class RootContainer;
 class UpdateLockImpl;
 class SoundManager;
+class ServerSideFontMetrics;
 
   namespace Http {
     class Cookie;
@@ -606,9 +611,10 @@ public:
    * By passing an empty \p locale, the default locale is
    * chosen.
    *
-   * When the locale is changed, refresh() is called, which will
-   * resolve the strings of the current user-interface in the new
-   * locale.
+   * By default, when the locale is changed, refresh() is called, 
+   * which will resolve the strings of the current user-interface
+   * in the new locale. This can be changed by having the 
+   * \p doRefresh parameter set to \p false.
    *
    * At construction, the locale is copied from the environment
    * (WEnvironment::locale()), and this is the locale that was
@@ -617,7 +623,7 @@ public:
    *
    * \sa localizedStrings(), WString::tr()
    */
-  void setLocale(const WLocale& locale);
+  void setLocale(const WLocale& locale, bool doRefresh = true);
 
   /*! \brief Returns the current locale.
    *
@@ -2124,6 +2130,16 @@ public:
    */
   Signal<>& unsuspended() { return unsuspended_; }
 
+  /*! \brief Returns the font metrics for server-side rendering
+   *
+   * In case we require the fallback to render things server-side, this
+   * will require the construction of font metrics. The application will
+   * construct this object only once, as an optimization.
+   *
+   * In case the object did not yet exist, a new instance is created.
+   */
+  ServerSideFontMetrics *serverSideFontMetrics();
+
 protected:
   /*! \brief Notifies an event to the application.
    *
@@ -2412,6 +2428,9 @@ private:
 
   SignalMap exposedSignals_;   // signals that may be accessed
   ResourceMap exposedResources_; // resources that may be accessed
+#ifndef WT_TARGET_JAVA
+  std::map<WResource*, WWebSocketResource*> exposedWebSocketResources_; // link between exposed resource and their websocket "interface"
+#endif // WT_TARGET_JAVA
   ObjectMap encodedObjects_;   // objects encoded for internal purposes
                                  // like 'virtual pointers' (see D&D)
   std::set<std::string> justRemovedSignals_;
@@ -2435,6 +2454,13 @@ private:
   EventSignal<> showLoadingIndicator_, hideLoadingIndicator_;
   JSignal<> unloaded_;
   JSignal<> idleTimeout_;
+
+  // Track cookies added over application lifetime.
+  // WEnvironment does not update itself, so `setCookie` is not reflected by it.
+  WEnvironment::CookieMap addedCookies_;
+  const std::string* findAddedCookies(const std::string& name) const;
+  // Remove the added cookie, for correct bookkeeping.
+  void removeAddedCookies(const std::string& name);
 
   WContainerWidget *timerRoot() const { return timerRoot_; }
   WEnvironment& env(); // short-hand for session_->env()
@@ -2460,6 +2486,16 @@ private:
   WResource *decodeExposedResource(const std::string& resourceMapKey) const;
   WResource *decodeExposedResource(const std::string& resourceMapKey,
                                    unsigned long rand) const;
+
+#ifndef WT_TARGET_JAVA
+  // Manipulation of the link between websocket resources and resources
+
+  // Adds a (private) WWebSocketResource to the application.
+  // It functions similarly to simply adding a normal WResource
+  void addWebSocketResource(WWebSocketResource* webSocketResource);
+  void removeWebSocketResource(WWebSocketResource* webSocketResource);
+  WWebSocketResource* findMatchingWebSocketResource(WResource* resource) const;
+#endif // WT_TARGET_JAVA
 
   /*
    * Methods for application state handling
@@ -2503,6 +2539,10 @@ private:
   SoundManager *getSoundManager();
   SoundManager *soundManager_;
 
+  // Server-side font metrics, constructed once (on demand),
+  // and reused by all painters that require it.
+  std::unique_ptr<ServerSideFontMetrics> serverSideFontMetrics_;
+
   static const char *RESOURCES_URL;
 
 #ifdef WT_TARGET_JAVA
@@ -2510,6 +2550,7 @@ private:
   JSlot hideLoadJS;
 #endif
 
+  friend class Auth::AuthModel;
   friend class WCssStyleSheet;
   friend class WebRenderer;
   friend class WebSession;
@@ -2530,6 +2571,9 @@ private:
   friend class WTimer;
   friend class WViewWidget;
   friend class WWidget;
+#ifndef WT_TARGET_JAVA
+  friend class WWebSocketResource;
+#endif // WT_TARGET_JAVA
   friend class WWebWidget;
 };
 

@@ -29,7 +29,8 @@ WLineEdit::WLineEdit()
   : textSize_(10),
     maxLength_(-1),
     echoMode_(EchoMode::Normal),
-    autoComplete_(true),
+    autoComplete_(AutoCompleteMode::On),
+    inputMode_(InputMode::Off),
     maskChanged_(false),
     spaceChar_(' '),
     javaScriptDefined_(false)
@@ -42,7 +43,8 @@ WLineEdit::WLineEdit(const WT_USTRING& text)
   : textSize_(10),
     maxLength_(-1),
     echoMode_(EchoMode::Normal),
-    autoComplete_(true),
+    autoComplete_(AutoCompleteMode::On),
+    inputMode_(InputMode::Off),
     maskChanged_(false),
     spaceChar_(' '),
     javaScriptDefined_(false)
@@ -122,9 +124,23 @@ void WLineEdit::setEchoMode(EchoMode echoMode)
 
 void WLineEdit::setAutoComplete(bool enabled)
 {
-  if (autoComplete_ != enabled) {
-    autoComplete_ = enabled;
+  setAutoComplete(enabled ? AutoCompleteMode::On : AutoCompleteMode::Off);
+}
+
+void WLineEdit::setAutoComplete(AutoCompleteMode token)
+{
+  if (autoComplete_ != token) {
+    autoComplete_ = token;
     flags_.set(BIT_AUTOCOMPLETE_CHANGED);
+    repaint();
+  }
+}
+
+void WLineEdit::setInputMode(InputMode mode)
+{
+  if (mode != inputMode_) {
+    inputMode_ = mode;
+    flags_.set(BIT_INPUT_MODE_CHANGED);
     repaint();
   }
 }
@@ -142,17 +158,78 @@ void WLineEdit::updateDom(DomElement& element, bool all)
   }
 
   if (all || flags_.test(BIT_ECHO_MODE_CHANGED)) {
-    element.setAttribute("type", echoMode_ == EchoMode::Normal
-                         ? "text" : "password");
+    element.setAttribute("type", type());
     flags_.reset(BIT_ECHO_MODE_CHANGED);
   }
 
   if (all || flags_.test(BIT_AUTOCOMPLETE_CHANGED)) {
-    if (!all || !autoComplete_) {
-      element.setAttribute("autocomplete",
-                           autoComplete_ == true ? "on" : "off");
+    if (!all || autoComplete_ != AutoCompleteMode::On) {
+      switch (autoComplete_) {
+        case AutoCompleteMode::Off:
+          element.setAttribute("autocomplete", "off");
+          break;
+
+        case AutoCompleteMode::On:
+          element.setAttribute("autocomplete", "on");
+          break;
+
+        case AutoCompleteMode::NewPassword:
+          element.setAttribute("autocomplete", "new-password");
+          break;
+
+        case AutoCompleteMode::CurrentPassword:
+          element.setAttribute("autocomplete", "current-password");
+          break;
+
+        case AutoCompleteMode::Username:
+          element.setAttribute("autocomplete", "username");
+          break;
+      }
     }
     flags_.reset(BIT_AUTOCOMPLETE_CHANGED);
+  }
+
+  if (all || flags_.test(BIT_INPUT_MODE_CHANGED)) {
+    if (!all || inputMode_ != InputMode::Off) {
+      switch (inputMode_) {
+        case InputMode::Off:
+          element.removeAttribute("inputmode");
+          break;
+
+        case InputMode::None:
+          element.setAttribute("inputmode", "none");
+          break;
+
+        case InputMode::Text:
+          element.setAttribute("inputmode", "text");
+          break;
+
+        case InputMode::Tel:
+          element.setAttribute("inputmode", "tel");
+          break;
+
+        case InputMode::Url:
+          element.setAttribute("inputmode", "url");
+          break;
+
+        case InputMode::Email:
+          element.setAttribute("inputmode", "email");
+          break;
+
+        case InputMode::Numeric:
+          element.setAttribute("inputmode", "numeric");
+          break;
+
+        case InputMode::Decimal:
+          element.setAttribute("inputmode", "decimal");
+          break;
+
+        case InputMode::Search:
+          element.setAttribute("inputmode", "search");
+          break;
+      }
+    }
+    flags_.reset(BIT_INPUT_MODE_CHANGED);
   }
 
   if (all || flags_.test(BIT_TEXT_SIZE_CHANGED)) {
@@ -222,7 +299,7 @@ void WLineEdit::setValueText(const WT_USTRING& value)
   setText(value);
 }
 
-int WLineEdit::boxPadding(Orientation orientation) const
+int WLineEdit::boxPadding(WT_MAYBE_UNUSED Orientation orientation) const
 {
   const WEnvironment& env = WApplication::instance()->environment();
 
@@ -239,7 +316,7 @@ int WLineEdit::boxPadding(Orientation orientation) const
     return 1;
 }
 
-int WLineEdit::boxBorder(Orientation orientation) const
+int WLineEdit::boxBorder(WT_MAYBE_UNUSED Orientation orientation) const
 {
   const WEnvironment& env = WApplication::instance()->environment();
 
@@ -348,6 +425,11 @@ void WLineEdit::render(WFlags<RenderFlag> flags)
     defineJavaScript();
 
   WFormWidget::render(flags);
+}
+
+std::string WLineEdit::type() const noexcept
+{
+  return echoMode_ == EchoMode::Normal ? "text" : "password";
 }
 
 // Remove spaces, only for input masks

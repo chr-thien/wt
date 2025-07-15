@@ -51,8 +51,10 @@ protected:
 
   virtual void stop() override;
 
+  void doSocketTransferCallback() override;
+
   /// Socket for the connection.
-  asio::ip::tcp::socket socket_;
+  std::unique_ptr<asio::ip::tcp::socket> socket_;
 };
 
 typedef std::shared_ptr<TcpConnection> TcpConnectionPtr;

@@ -14,12 +14,14 @@
 #include "Wt/WContainerWidget.h"
 #include "Wt/WEnvironment.h"
 #include "Wt/WException.h"
+#include "Wt/WServer.h"
 #include "Wt/WStringStream.h"
 #include "Wt/WTheme.h"
 
 #include "DomElement.h"
 #include "WebUtils.h"
 #include "StringUtils.h"
+#include "Configuration.h"
 
 namespace {
 
@@ -48,6 +50,38 @@ std::string elementNames_[] =
     "b", "strong", "em", "i", "hr",
 
     "datalist"
+  };
+
+/*
+ * Issue #13063: This is used to check element names of OTHER DOM
+ * ElementType to prevent from potential attacks if an attacker somehow
+ * manages to add a widget to a page and modify its element name. This
+ * will prevent the attacker from being able to set the tag to a
+ * dangerous one such as script.
+ * 
+ * An element is safe if it only affects the layout of the page and
+ * does not perform a download or code execution.
+ * 
+ * This list MUST end with an empty string!
+ */
+std::string safeElementNames_[] =
+  { "address", "article", "aside", "footer",
+    "header", "h1", "h2", "h3", "h4", "h5", "h6", "hgroup",
+    "main", "nav", "section", "search",
+
+    "blockquote", "div", "p", "pre", "hr",
+    "figcaption", "figure",
+    "dd", "dl", "dt", "li", "ul", "ol", "menu",
+
+    "a", "abbr", "b", "bdi", "bdo", "br", "cite", "code", "data",
+    "dfn", "em", "i", "kdb", "mark", "q", "rp", "rt", "ruby", "s",
+    "samp", "small", "span", "strong", "sub", "sup", "time", "u",
+    "var", "wbr",
+
+    "caption", "col", "colgroup", "table", "tbody", "td", "tfoot",
+    "th", "thead", "tr",
+
+    "" // end of list
   };
 
 bool defaultInline_[] =
@@ -162,7 +196,6 @@ CssPropertyMap createCssCamelNamesMap()
 {
   CssPropertyMap cssCamelNames;
   Wt::Utils::insert(cssCamelNames, Wt::Property::Style,std::string("cssText"));
-  Wt::Utils::insert(cssCamelNames, Wt::Property::Style,std::string("width"));
   Wt::Utils::insert(cssCamelNames, Wt::Property::StylePosition,std::string("position"));
   Wt::Utils::insert(cssCamelNames, Wt::Property::StyleZIndex,std::string("zIndex"));
   Wt::Utils::insert(cssCamelNames, Wt::Property::StyleFloat,std::string("cssFloat"));
@@ -580,7 +613,7 @@ void DomElement::processProperties(WApplication *app) const
   }
 }
 
-void DomElement::processEvents(WApplication *app) const
+void DomElement::processEvents(WT_MAYBE_UNUSED WApplication* app) const
 {
   DomElement *self = const_cast<DomElement *>(this);
 
@@ -611,11 +644,11 @@ void DomElement::setTimeout(int delay, int interval)
 void DomElement::callJavaScript(const std::string& jsCode,
                                 bool evenWhenDeleted)
 {
-  ++numManipulations_;
   // Bug #12283: Ensure the js string isn't empty (for back())
   if (jsCode.empty()) {
     return;
   }
+  ++numManipulations_;
 
   // Bug #12006: For safety always append semicolon
   std::string terminatedJsCode = jsCode;
@@ -962,8 +995,6 @@ void DomElement::asHTML(EscapeOStream& out,
 
   const bool supportButton = true;
 
-  bool needAnchorWrap = false;
-
   if (!supportButton && type_ == DomElementType::BUTTON) {
     renderedType = DomElementType::INPUT;
 
@@ -1046,10 +1077,6 @@ void DomElement::asHTML(EscapeOStream& out,
       else
         out << "\"\"";
     }
-  } else if (needAnchorWrap) {
-    out << "<a href=\"#\" class=\"Wt-wrap\" onclick=";
-    fastHtmlAttributeValue(out, attributeValues, clickEvent->second.jsCode);
-    out << "><" << elementNames_[static_cast<unsigned int>(renderedType)];
   } else if (renderedType == DomElementType::OTHER)  // Custom tag name
         out << '<' << elementTagName_;
   else
@@ -1072,14 +1099,28 @@ void DomElement::asHTML(EscapeOStream& out,
          i != eventHandlers_.end(); ++i) {
       if (!i->second.jsCode.empty()) {
         if (globalUnfocused_
+            || app->environment().server()->configuration().useScriptNonce()
             || (i->first == WInteractWidget::WHEEL_SIGNAL &&
                 app->environment().agentIsIE() &&
                 static_cast<unsigned int>(app->environment().agent()) >=
                 static_cast<unsigned int>(UserAgent::IE9)))
           setJavaScriptEvent(javaScript, i->first, i->second, app);
         else {
-          out << " on" << const_cast<char *>(i->first) << '=';
-          fastHtmlAttributeValue(out, attributeValues, i->second.jsCode);
+          // All event handlers ought to be JS, not DOM: #13501
+          std::string elementId = id();
+          if (elementId.empty()) {
+            WObject dummy;
+            elementId = dummy.id();
+            out << " id=";
+            fastHtmlAttributeValue(out, attributeValues, elementId);
+          }
+          auto eventName = const_cast<char *>(i->first);
+          WStringStream eventJS;
+          eventJS << WT_CLASS << ".$('" << elementId << "').on" << eventName << " = "
+                  << "function() {"
+                  <<   i->second.jsCode << ";"
+                  << "};";
+          app->doJavaScript(eventJS.str());
         }
       }
     }
@@ -1202,7 +1243,7 @@ void DomElement::asHTML(EscapeOStream& out,
      * normally an `input` is selfclosing.
      */
     if (!isSelfClosingTag(renderedType)
-        || renderedType == DomElementType::INPUT && !childrenToAdd_.empty() && childrenToAdd_[0].child->type() == DomElementType::DATALIST) {
+        || (renderedType == DomElementType::INPUT && !childrenToAdd_.empty() && childrenToAdd_[0].child->type() == DomElementType::DATALIST)) {
       out << '>';
       for (unsigned i = 0; i < childrenToAdd_.size(); ++i)
         childrenToAdd_[i].child->asHTML(out, javaScript, timeouts);
@@ -1216,20 +1257,23 @@ void DomElement::asHTML(EscapeOStream& out,
           && app->environment().agent() == UserAgent::IE6
           && innerHTML.empty()
           && childrenToAdd_.empty()
-          && childrenHtml_.empty())
+          && childrenHtml_.empty()) {
         out << "&nbsp;";
-          if (renderedType  == DomElementType::OTHER) // Custom tag name
-            out << "</" << elementTagName_ << ">";
-          else
-            out << "</" << elementNames_[static_cast<unsigned int>(renderedType)]
-                << ">";
-    } else
-      out << " />";
+      }
 
-    if (needButtonWrap && supportButton)
+      if (renderedType  == DomElementType::OTHER) {// Custom tag name
+        out << "</" << elementTagName_ << ">";
+      } else {
+        out << "</" << elementNames_[static_cast<unsigned int>(renderedType)]
+            << ">";
+      }
+    } else {
+      out << " />";
+    }
+
+    if (needButtonWrap && supportButton) {
       out << "</button>";
-    else if (needAnchorWrap)
-      out << "</a>";
+    }
   }
 
   javaScript << javaScriptEvenWhenDeleted_ << javaScript_;
@@ -1373,8 +1417,24 @@ void DomElement::createElement(EscapeOStream& out, WApplication *app,
     renderInnerHtmlJS(out, app);
     renderDeferredJavaScript(out);
   } else {
-    out << "document.createElement('"
-        << elementNames_[static_cast<unsigned int>(type_)] << "');";
+    out << "document.createElement('";
+    if (type_ == DomElementType::OTHER){
+      bool foundTag = false;
+      for (int i = 0; !safeElementNames_[i].empty(); ++i) {
+        if (safeElementNames_[i] == elementTagName_) {
+          foundTag = true;
+          break;
+        }
+      }
+      if (foundTag) {
+        out << elementTagName_;
+      } else {
+        LOG_WARN("DomElement::createElement(): Cannot create custom ('OTHER') element with tag '" + elementTagName_ + "'");
+      }
+    } else {
+      out << elementNames_[static_cast<unsigned int>(type_)];
+    }
+    out << "');";
     out << domInsertJS;
     asJavaScript(out, Priority::Create);
     asJavaScript(out, Priority::Update);

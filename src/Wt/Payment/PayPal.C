@@ -84,7 +84,13 @@ public:
       "<!DOCTYPE html>"
       "<html lang=\"en\" dir=\"ltr\">\n"
       "<head><title></title>\n"
-      "<script type=\"text/javascript\">\n"
+      "<script"
+      " type=\"text/javascript\"";
+    if (!response.nonce().empty()) {
+      o << " nonce=\""<<response.nonce()<<"\"";
+    }
+    o <<
+      ">\n"
       "function load() { "
       """if (window.opener." << appJs << ") {"
       ""  "var " << appJs << "= window.opener." << appJs << ";"
@@ -513,7 +519,7 @@ void PayPalExpressCheckout::saveCustomerDetails(Http::ParameterMap &params)
   impl_->customer_.setShippingAddress(adderss);
 }
 
-Signal<Result>& PayPalExpressCheckout::completePayment(const Money& totalAmount)
+Signal<Result>& PayPalExpressCheckout::completePayment(WT_MAYBE_UNUSED const Money& money)
 {
   impl_->httpClient_ = impl_->service_.createHttpClient();
   auto client = impl_->httpClient_.get();

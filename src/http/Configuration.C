@@ -11,8 +11,9 @@
 #include "Configuration.h"
 #include "WebUtils.h"
 #include "StringUtils.h"
+#include "MimeTypes.h"
 
-#include <boost/filesystem.hpp>
+#include "Wt/cpp17/filesystem.hpp"
 
 #ifndef WT_WIN32
 #include <unistd.h>
@@ -49,6 +50,7 @@ Configuration::Configuration(Wt::WLogger& logger, bool silent)
     compression_(true),
     gdb_(false),
     configPath_(),
+    fileExtMapPath_(),
     staticCacheControl_("max-age=3600"),
     httpPort_("80"),
     httpsPort_("443"),
@@ -90,7 +92,7 @@ void Configuration::createOptions(po::options_description& options,
 
     ("threads,t",
      po::value<int>(&threads_)->default_value(threads_),
-     "number of threads (-1 indicates that num_threads from wt_config.xml "
+     "number of threads (-1 indicates that num-threads from wt_config.xml "
      "is to be used, which defaults to 10)")
 
     ("servername",
@@ -124,7 +126,8 @@ void Configuration::createOptions(po::options_description& options,
 
     ("accesslog",
      po::value<std::string>(&accessLog_),
-     "access log file (defaults to stdout), "
+     "access log file, "
+     "if not specified, access logs are logged like other logs, "
      "to disable access logging completely, use --accesslog=-")
 
     ("no-compression",
@@ -148,6 +151,15 @@ void Configuration::createOptions(po::options_description& options,
       "variable $WT_CONFIG_XML is used, or else the built-in default "
       "(" + std::string(WT_CONFIG_XML) + ") is tried, or else built-in "
       "defaults are used").c_str())
+
+    ("mime-map-append",
+     po::value<std::string>(&fileExtMapPath_),
+     "location of wt_mimeMap.csv; the mappings in wt_mimeMap will be added to the default mappings.")
+
+     ("mime-map-override",
+     po::value<std::string>(&fileExtMapPath_),
+     "location of wt_mimeMap.csv; if unspecified, the built-in default is used. "
+     "The mappings in wt_mimeMap will be used instead of to the default mappings.")
 
     ("static-cache-control",
      po::value<std::string>(&staticCacheControl_)->default_value(staticCacheControl_),
@@ -369,6 +381,14 @@ void Configuration::readOptions(const po::variables_map& vm)
   } else
     throw Wt::WServer::Exception("Document root (--docroot) was not set.");
 
+  if (vm.count("mime-map-append")) {
+    mime_types::updateMapping(vm["mime-map-append"].as<std::string>());
+  }
+
+  if (vm.count("mime-map-override")) {
+    mime_types::setMapping(vm["mime-map-override"].as<std::string>());
+  }
+
   if (vm.count("http-address"))
     httpAddress_ = vm["http-address"].as<std::string>();
 
@@ -461,8 +481,8 @@ void Configuration::checkPath(std::string& result,
                               std::string varDescription,
                               int options)
 {
-  namespace fs = boost::filesystem;
-  boost::system::error_code ec;
+  namespace fs = Wt::cpp17::filesystem;
+  Wt::cpp17::fs_error_code ec;
   const auto status = fs::status(result, ec);
   if (ec) {
     throw Wt::WServer::Exception(varDescription
@@ -490,7 +510,16 @@ void Configuration::checkPath(std::string& result,
     }
 #ifndef WT_WIN32
     if (options & Private) {
-      if ((status.permissions() & (fs::perms::group_all | fs::perms::others_all)) != fs::perms::no_perms) {
+      /* We want to compare the resulting permissions against
+       * fs::perms::no_perms in case boost is used for
+       * cpp17::filesystem but we want to instead compare it against
+       * fs::perms::none in case std::filesystem is used for
+       * cpp17::filesystem.
+       *
+       * Since both of those values are equivalent to 0, we just use
+       * static_cast.
+       */
+      if (static_cast<unsigned>(status.permissions() & (fs::perms::group_all | fs::perms::others_all))) {
         throw Wt::WServer::Exception(varDescription + " (\"" + result
                             + "\") must be unreadable for group and others.");
       }

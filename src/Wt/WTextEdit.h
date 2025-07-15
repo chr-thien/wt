@@ -22,8 +22,8 @@ namespace Wt {
  * add additional formatting options.
  *
  * The implementation is based on <a
- * href="http://tinymce.moxiecode.com/">TinyMCE</a>. The widget may be
- * configured and tailored using the setConfigurationSetting() and
+ * href="https://github.com/tinymce/tinymce">TinyMCE</a>. The widget may
+ * be configured and tailored using the setConfigurationSetting() and
  * related methods that provide direct access to the underlying
  * TinyMCE component.
  *
@@ -47,7 +47,7 @@ namespace Wt {
  * deploy the <tt>js/tinymce</tt> folder to <i>tinyMCEBaseURL</i>. The
  * default value for <i>tinyMCEBaseURL</i> for TinyMCE 4 (or later) is
  * is <i>resourcesURL</i><tt>/tinymce</tt> (i.e., we assume by default that you
- * copy the <tt>tiny_mce</tt> folder to the <tt>resources/</tt>
+ * copy the <tt>tinymce</tt> folder to the <tt>resources/</tt>
  * folder).
  *
  * If the name of the main TinyMCE JavaScript file is not tinymce.js
@@ -203,7 +203,9 @@ public:
   /*! \brief Configure a TinyMCE setting.
    *
    * A list of possible settings can be found at:
-   * http://tinymce.moxiecode.com/wiki.php/Configuration
+   * https://www.tiny.cloud/docs/tinymce/5/configure/
+   * or for older versions:
+   * https://github.com/tinymce/tinymce-docs/
    *
    * The widget itself will also define a number of configuration settings
    * and these may be overridden using this method.
@@ -220,11 +222,25 @@ public:
 
   /*! \brief Sets the placeholder text.
    *
-   * This method is not supported on WTextEdit and will thrown an exception
-   * instead.
+   * This sets the text that is shown when the field is empty. This
+   * function will not work if called after this widget has been
+   * loaded.
+   *
+   * This method is not supported on WTextEdit if the version of
+   * TinyMCE is lower than 5 and will thrown an exception instead.
    */
   virtual void setPlaceholderText(const WString& placeholder) override;
 
+  /*! \brief Sets the element read-only.
+   *
+   * A read-only form element cannot be edited, but the contents can
+   * still be selected.
+   *
+   * By default, a WTextEdit is not read-only.
+   *
+   * \note For TinyMCE 4 or lower, this method does not work after the
+   * WTextEdit has been initialised.
+   */
   virtual void setReadOnly(bool readOnly) override;
   virtual void propagateSetEnabled(bool enabled) override;
   virtual void resize(const WLength& width, const WLength& height) override;
@@ -252,7 +268,12 @@ private:
   JSignal<> onChange_;
   JSignal<> onRender_;
   int version_;
-  bool contentChanged_;
+  bool initialised_;
+
+  static const int BIT_CONTENT_CHANGED  = 0;
+  static const int BIT_READONLY_CHANGED = 1;
+  std::bitset<2> flags_;
+
   std::map<std::string, cpp17::any> configurationSettings_;
 
   std::string plugins() const;
@@ -261,6 +282,12 @@ private:
   void propagateOnChange();
   static void initTinyMCE();
   static int getTinyMCEVersion();
+
+#ifndef WT_TARGET_JAVA
+  static bool verifyTinyMCEVersion(int version);
+#endif
+
+  static std::string getTinyMCEPath();
 };
 
 }

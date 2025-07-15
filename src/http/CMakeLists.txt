@@ -120,6 +120,12 @@ IF(CONNECTOR_HTTP)
           DESTINATION ${CMAKE_INSTALL_DIR}/wt
           NAMESPACE Wt::)
 
+  if(MSVC AND SHARED_LIBS)
+    install(FILES $<TARGET_PDB_FILE:wthttp>
+            DESTINATION bin
+            OPTIONAL)
+  endif()
+
   SET_TARGET_PROPERTIES(
     wthttp
   PROPERTIES

@@ -18,6 +18,9 @@
 #include "Wt/WMemoryResource.h"
 #include "Wt/WServer.h"
 #include "Wt/WTimer.h"
+#ifndef WT_TARGET_JAVA
+#include "Wt/WWebSocketResource.h"
+#endif // WT_TARGET_JAVA
 #include "Wt/Http/Cookie.h"
 
 #include "WebSession.h"
@@ -26,6 +29,7 @@
 #include "SoundManager.h"
 #include "WebController.h"
 #include "WebUtils.h"
+#include "ServerSideFontMetrics.h"
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/pool/pool.hpp>
@@ -131,7 +135,8 @@ WApplication::WApplication(const WEnvironment& env
     hideLoadingIndicator_("hideload", this),
     unloaded_(this, "Wt-unload"),
     idleTimeout_(this, "Wt-idleTimeout"),
-    soundManager_(nullptr)
+    soundManager_(nullptr),
+    serverSideFontMetrics_(nullptr)
 {
   session_->setApplication(this);
   locale_ = environment().locale();
@@ -425,6 +430,14 @@ WApplication::~WApplication()
 WWebWidget *WApplication::domRoot() const
 {
   return domRoot_.get();
+}
+
+ServerSideFontMetrics *WApplication::serverSideFontMetrics()
+{
+  if (!serverSideFontMetrics_)
+    serverSideFontMetrics_.reset(new ServerSideFontMetrics());
+
+  return serverSideFontMetrics_.get();
 }
 
 void WApplication::attachThread(bool attach)
@@ -894,6 +907,17 @@ std::string WApplication::addExposedResource(WResource *resource)
   }
 }
 
+#ifndef WT_TARGET_JAVA
+void WApplication::addWebSocketResource(WWebSocketResource* webSocketResource)
+{
+  if (environment().server()->configuration().webSockets()) {
+    exposedWebSocketResources_[webSocketResource->handleResource().get()] = webSocketResource;
+  } else {
+    LOG_WARN("WebSockets are disabled by config, but a WWebSocketResource is used. Resource will be unreachable.");
+  }
+}
+#endif // WT_TARGET_JAVA
+
 bool WApplication::removeExposedResource(WResource *resource)
 {
   std::string key = resourceMapKey(resource);
@@ -910,6 +934,17 @@ bool WApplication::removeExposedResource(WResource *resource)
     return false;
 }
 
+#ifndef WT_TARGET_JAVA
+void WApplication::removeWebSocketResource(WWebSocketResource* webSocketResource)
+{
+  for (auto i = exposedWebSocketResources_.begin(); i != exposedWebSocketResources_.end(); ++i) {
+    if (i->second == webSocketResource) {
+      exposedWebSocketResources_.erase(i);
+    }
+  }
+}
+#endif // WT_TARGET_JAVA
+
 WResource *WApplication::decodeExposedResource(const std::string& resourceKey)
   const
 {
@@ -925,6 +960,19 @@ WResource *WApplication::decodeExposedResource(const std::string& resourceKey)
       return nullptr;
   }
 }
+
+#ifndef WT_TARGET_JAVA
+WWebSocketResource* WApplication::findMatchingWebSocketResource(WResource* resource) const
+{
+  auto i = exposedWebSocketResources_.find(resource);
+
+  if (i != exposedWebSocketResources_.end()) {
+    return i->second;
+  }
+
+  return nullptr;
+}
+#endif // WT_TARGET_JAVA
 
 WResource *WApplication::decodeExposedResource(const std::string& resourceKey,
                                                unsigned long ver) const
@@ -962,11 +1010,13 @@ WObject *WApplication::decodeObject(const std::string& objectId) const
     return nullptr;
 }
 
-void WApplication::setLocale(const WLocale& locale)
+void WApplication::setLocale(const WLocale& locale, bool doRefresh)
 {
   locale_ = locale;
   localeChanged_ = true;
-  refresh();
+  if (doRefresh) {
+    refresh();
+  }
 }
 
 void WApplication::setBodyClass(const std::string& styleClass)
@@ -1177,6 +1227,8 @@ void WApplication::setCookie(const std::string& name,
   cookie.setSecure(secure);
 
   session_->renderer().setCookie(cookie);
+
+  addedCookies_[name] = value;
 }
 
 #ifndef WT_TARGET_JAVA
@@ -1210,6 +1262,9 @@ void WApplication::setCookie(const Http::Cookie& cookie)
 void WApplication::removeCookie(const Http::Cookie& cookie)
 {
   session_->renderer().removeCookie(cookie);
+
+  // Stop tracking this previously added cookie.
+  removeAddedCookies(cookie.name());
 }
 
 void WApplication::removeCookie(const std::string& name,
@@ -1221,6 +1276,9 @@ void WApplication::removeCookie(const std::string& name,
   rmCookie.setPath(path);
 
   session_->renderer().removeCookie(rmCookie);
+
+  // Stop tracking this previously added cookie.
+  removeAddedCookies(name);
 }
 
 void WApplication::addMetaLink(const std::string &href,
@@ -1832,5 +1890,20 @@ void WApplication::resumeRendering()
   session_->resumeRendering();
 }
 #endif // WT_TARGET_JAVA
+
+const std::string* WApplication::findAddedCookies(const std::string& name) const
+{
+  WEnvironment::CookieMap::const_iterator i = addedCookies_.find(name);
+
+  if (i == addedCookies_.end())
+    return nullptr;
+  else
+    return &i->second;
+}
+
+void WApplication::removeAddedCookies(const std::string& name)
+{
+  addedCookies_.erase(name);
+}
 
 }

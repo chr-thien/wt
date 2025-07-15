@@ -51,7 +51,9 @@ typedef std::shared_ptr<Reply> ReplyPtr;
 class WTHTTP_API Reply : public std::enable_shared_from_this<Reply>
 {
 public:
-  Reply(Request& request, const Configuration& config);
+  Reply(Request& request, 
+        const Configuration& config,
+        const Wt::Configuration* wtConfig = nullptr);
   virtual ~Reply();
 
   virtual void reset(const Wt::EntryPoint *ep);
@@ -124,7 +126,31 @@ public:
   void detectDisconnect(const std::function<void()>& callback);
 
 
+  /* \brief Adds an entry to the headers list.
+   *
+   * These headers are then added to the outgoing request, created by
+   * nextBuffers(). If headers are added multiple times, they are also
+   * added multiple times to the request. An empty header is still added.
+   * This will result in the name of the header being present, but no
+   * value being specified.
+   *
+   * A header is added in the format: <code>name: value</code>.
+   */
   void addHeader(const std::string name, const std::string value);
+
+  /* \brief Inserts an entry into the headers list.
+   *
+   * These headers are then added to the outgoing request, created by
+   * nextBuffers(). If the header was already added, its first occurence
+   * will be replaced by the given value. This function can be useful
+   * for headers that are only to be added once.
+   *
+   * Passing a header with an empty value to this function, will remove
+   * the first occurence of this header from the request.
+   *
+   * A header is added in the format: <code>name: value</code>.
+   */
+  void insertHeader(const std::string name, const std::string value);
 
   void receive();
   void send();
@@ -138,6 +164,7 @@ public:
 protected:
   Request& request_;
   const Configuration& configuration_;
+  const Wt::Configuration* wtConfig_;
 
   virtual std::string contentType() = 0;
   virtual std::string location();
@@ -183,6 +210,7 @@ private:
 
   bool encodeNextContentBuffer(std::vector<asio::const_buffer>& result,
                                int& originalSize, int& encodedSize);
+  void addDefaultHeaders();
 #ifdef WTHTTP_WITH_ZLIB
   void initGzip();
   bool gzipBusy_;

@@ -32,7 +32,7 @@
 
 namespace Wt {
 
-LOGGER("WLeafletMap");
+WT_MAYBE_UNUSED LOGGER("WLeafletMap");
 
 const std::string WLeafletMap::WIDGETMARKER_CONTAINER_RULENAME = "WLeafletMap::WidgetMarker::container";
 const std::string WLeafletMap::WIDGETMARKER_CONTAINER_CHILDREN_RULENAME = "WLeafletMap::WidgetMarker::container-children";
@@ -229,7 +229,7 @@ bool WLeafletMap::Marker::needsUpdate() const
   return false;
 }
 
-void WLeafletMap::Marker::update(WStringStream &js)
+void WLeafletMap::Marker::update(WT_MAYBE_UNUSED WStringStream& js)
 { }
 
 WLeafletMap::WidgetMarker::WidgetMarker(const Coordinate &pos,
@@ -503,7 +503,7 @@ void WLeafletMap::addMarker(std::unique_ptr<Marker> marker)
   marker->setMap(this);
 
   for (std::size_t i = 0; i < markers_.size(); ++i) {
-    if (markers_[i].marker == marker.get() &&
+    if (markers_[i].uMarker.get() == marker.get() &&
         markers_[i].flags.test(MarkerEntry::BIT_REMOVED)) {
       markers_[i].uMarker = std::move(marker);
       markers_[i].flags.reset(MarkerEntry::BIT_REMOVED);

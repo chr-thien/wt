@@ -23,8 +23,24 @@
 #include "web/DateUtils.h"
 
 #include <cassert>
+#include <cctype>
 #include <chrono>
 #include <string>
+
+#ifdef WT_BUILDING
+#  define LOG_ACCESS_S(s,m) (s)->log("access") << WT_LOGGER << ": " << m
+#  define LOG_ACCESS(m) do { \
+    if ( WT_LOGGING("access", WT_LOGGER)) \
+      WT_LOG("access") << WT_LOGGER << ": " << m; \
+    }  while(0)
+#endif
+
+namespace {
+bool ichar_equals(char a, char b)
+{
+  return std::tolower(static_cast<unsigned char>(a)) == std::tolower(static_cast<unsigned char>(b));
+}
+}
 
 namespace Wt {
   LOGGER("wthttp");
@@ -126,9 +142,12 @@ void toText(S& stream, Reply::status_type status)
 
 } // namespace status_strings
 
-Reply::Reply(Request& request, const Configuration& config)
+Reply::Reply(Request& request,
+        const Configuration& config,
+        const Wt::Configuration* wtConfig)
   : request_(request),
     configuration_(config),
+    wtConfig_(wtConfig),
     status_(no_status),
     transmitting_(false),
     closeConnection_(false),
@@ -139,7 +158,9 @@ Reply::Reply(Request& request, const Configuration& config)
 #ifdef WTHTTP_WITH_ZLIB
     , gzipBusy_(false)
 #endif // WTHTTP_WITH_ZLIB
-{ }
+{
+  addDefaultHeaders();
+}
 
 Reply::~Reply()
 {
@@ -150,10 +171,10 @@ Reply::~Reply()
 #endif // WTHTTP_WITH_ZLIB
 }
 
-void Reply::writeDone(bool success)
+void Reply::writeDone(WT_MAYBE_UNUSED bool success)
 { }
 
-void Reply::reset(const Wt::EntryPoint *ep)
+void Reply::reset(WT_MAYBE_UNUSED const Wt::EntryPoint* ep)
 {
 #ifdef WTHTTP_WITH_ZLIB
   if (gzipBusy_) {
@@ -163,6 +184,7 @@ void Reply::reset(const Wt::EntryPoint *ep)
 #endif // WTHTTP_WITH_ZLIB
 
   headers_.clear();
+  addDefaultHeaders();
   status_ = no_status;
   transmitting_ = false;
   closeConnection_ = false;
@@ -179,10 +201,8 @@ void Reply::setStatus(status_type status)
   status_ = status;
 }
 
-bool Reply::consumeWebSocketMessage(ws_opcode opcode,
-                                    const char* begin,
-                                    const char* end,
-                                    Request::State state)
+bool Reply::consumeWebSocketMessage(WT_MAYBE_UNUSED ws_opcode opcode, WT_MAYBE_UNUSED const char* begin,
+                                    WT_MAYBE_UNUSED const char* end, WT_MAYBE_UNUSED Request::State state)
 {
   LOG_ERROR("Reply::consumeWebSocketMessage() is pure virtual");
   assert(false);
@@ -197,6 +217,25 @@ std::string Reply::location()
 void Reply::addHeader(const std::string name, const std::string value)
 {
   headers_.push_back(std::make_pair(name, value));
+}
+
+void Reply::insertHeader(const std::string name, const std::string value)
+{
+  auto foundIterator = std::find_if(headers_.begin(), headers_.end(), [name](const std::pair<std::string, std::string>& item) {
+    return std::equal(item.first.begin(), item.first.end(), name.begin(), name.end(), ichar_equals);
+  });
+
+  if (foundIterator == headers_.end()) {
+    if (!value.empty()) {
+      headers_.push_back(std::make_pair(name, value));
+    }
+  } else {
+    if (value.empty()) {
+      headers_.erase(foundIterator);
+    } else {
+      foundIterator->second = value;
+    }
+  }
 }
 
 namespace {
@@ -440,9 +479,11 @@ void Reply::setConnection(ConnectionPtr connection)
 
 void Reply::receive()
 {
-  connection_->strand().post
-    (std::bind(&Connection::readMore, connection_,
-               shared_from_this(), 120));
+  asio::post(connection_->strand(),
+             std::bind(&Connection::readMore,
+                       connection_,
+                       shared_from_this(),
+                       120));
 }
 
 void Reply::send()
@@ -453,10 +494,11 @@ void Reply::send()
     LOG_DEBUG("Reply: send(): scheduling write response.");
 
     // We post this since we want to avoid growing the stack indefinitely
-    connection_->server()->service().post
-      (connection_->strand().wrap
-       (std::bind(&Connection::startWriteResponse, connection_,
-                  shared_from_this())));
+    asio::post(connection_->server()->service(),
+               connection_->strand().wrap(
+                  std::bind(&Connection::startWriteResponse,
+                            connection_,
+                            shared_from_this())));
   }
 }
 
@@ -478,18 +520,29 @@ void Reply::logReply(Wt::WLogger& logger)
   if (relay_.get())
     return relay_->logReply(logger);
 
-  Wt::WStringStream e;
-  e << request_.remoteIP << " "
-    << /* rfc931 << */ " "
-    << /* authuser << */ " "
-    << request_.method.str() << ' '
-    << request_.uri.str() << " HTTP/"
-    << request_.http_version_major << '.'
-    << request_.http_version_minor << " "
-    << status_ << " "
-    << std::to_string(contentSent_);
-  LOG_INFO(e.str());
+  if (logger.logging("access", WT_LOGGER)) {
+    Wt::WStringStream msg;
+    msg << request_.remoteIP << " "
+        << /* rfc931 << */ " "
+        << /* authuser << */ " "
+        << request_.method.str() << ' '
+        << request_.uri.str() << " HTTP/"
+        << request_.http_version_major << '.'
+        << request_.http_version_minor << " "
+        << status_ << " "
+        << std::to_string(contentSent_);
 
+    if (configuration_.accessLog().empty()) {
+      LOG_ACCESS(msg.str());
+    } else {
+      Wt::WLogEntry e = logger.entry("access");
+      e << Wt::WLogger::timestamp << Wt::WLogger::sep
+        << getpid() << Wt::WLogger::sep
+        << /* sessionId << */ Wt::WLogger::sep
+        << "[access]" << Wt::WLogger::sep
+        << WT_LOGGER << ": " << msg.str();
+    }
+  }
   /*
      if (gzipEncoding_)
      std::cerr << " <" << contentOriginalSize_ << ">";
@@ -540,7 +593,7 @@ bool Reply::encodeNextContentBuffer(
 
       gzipStrm_.avail_in = bs;
       gzipStrm_.next_in = const_cast<unsigned char*>(
-            asio::buffer_cast<const unsigned char*>(b));
+        static_cast<const unsigned char*>(b.data()));
 
       unsigned char out[16*1024];
       do {
@@ -585,6 +638,17 @@ bool Reply::encodeNextContentBuffer(
 #endif
 
   return lastData;
+}
+
+void Reply::addDefaultHeaders()
+{
+  if (wtConfig_) {
+    const std::vector<Wt::HttpHeader>& defaultHeaders = wtConfig_->httpHeaders();
+    for (size_t i = 0; i < defaultHeaders.size(); ++i) {
+      const Wt::HttpHeader& header = defaultHeaders[i];
+      addHeader(header.name(), header.contents());
+    }
+  }
 }
 
 } // namespace server

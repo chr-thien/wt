@@ -197,6 +197,8 @@ void WContainerWidget::clear()
 {
 #ifndef WT_NO_LAYOUT
   layout_.reset();
+  flags_.set(BIT_LAYOUT_NEEDS_RERENDER);
+  repaint();
 #endif
 
   while (!children_.empty())
@@ -444,8 +446,6 @@ void WContainerWidget::updateDom(DomElement& element, bool all)
     flags_.reset(BIT_PADDINGS_CHANGED);
   }
 
-  WInteractWidget::updateDom(element, all);
-
   if (flags_.test(BIT_OVERFLOW_CHANGED) ||
       (all && overflow_ &&
        !(overflow_[0] == Overflow::Visible &&
@@ -481,6 +481,8 @@ void WContainerWidget::updateDom(DomElement& element, bool all)
       if (positionScheme() == PositionScheme::Static)
         element.setProperty(Property::StylePosition, "relative");
   }
+
+  WInteractWidget::updateDom(element, all);
 }
 
 int WContainerWidget::firstChildIndex() const
@@ -584,8 +586,16 @@ DomElement *WContainerWidget::createDomElement(WApplication *app,
 
   DomElement *result = WWebWidget::createDomElement(app);
 
-  if (addChildren)
+  if (addChildren) {
     createDomChildren(*result, app);
+  }
+
+  // #13517: Do not let these flags remain active.
+  // These ought to be set once, and then consumed after the container
+  // renders. This is signaled in propagateRenderOk, but that doesn't
+  // catch all cases.
+  flags_.reset(BIT_LAYOUT_NEEDS_RERENDER);
+  flags_.reset(BIT_LAYOUT_NEEDS_UPDATE);
 
   return result;
 }

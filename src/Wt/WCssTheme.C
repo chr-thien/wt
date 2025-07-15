@@ -23,6 +23,7 @@
 #include "Wt/WSuggestionPopup.h"
 #include "Wt/WTabWidget.h"
 #include "Wt/WTimeEdit.h"
+#include "Wt/WIconPair.h"
 
 #include "DomElement.h"
 
@@ -137,7 +138,7 @@ void WCssTheme::apply(WWidget *widget, WWidget *child, int widgetRole) const
     child->addStyleClass("body");
     break;
   case PanelCollapseButton:
-    child->setFloatSide(Side::Left);
+    child->addStyleClass("Wt-collapse-button");
     break;
 
   case AuthWidgets:
@@ -251,13 +252,13 @@ void WCssTheme::apply(WWidget *widget, DomElement& element, int elementRole)
       }
 
       WDateEdit *dateEdit = dynamic_cast<WDateEdit *>(widget);
-      if (dateEdit) {
+      if (dateEdit && !dateEdit->nativeControl()) {
         element.addPropertyWord(Property::Class, "Wt-dateedit");
         return;
       }
 
       WTimeEdit *timeEdit = dynamic_cast<WTimeEdit *>(widget);
-      if (timeEdit) {
+      if (timeEdit && !timeEdit->nativeControl()) {
         element.addPropertyWord(Property::Class, "Wt-timeedit");
         return;
       }
@@ -329,7 +330,7 @@ void WCssTheme::applyValidationStyle(WWidget *widget,
   }
 }
 
-bool WCssTheme::canBorderBoxElement(const DomElement& element) const
+bool WCssTheme::canBorderBoxElement(WT_MAYBE_UNUSED const DomElement& element) const
 {
   return true;
 }

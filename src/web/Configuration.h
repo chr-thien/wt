@@ -105,6 +105,22 @@ private:
   std::string userAgent_;
 };
 
+class WT_API HttpHeader {
+public:
+  HttpHeader(std::string name,
+             std::string contents)
+    : name_(name),
+      contents_(contents)
+{ }
+
+  const std::string& contents() const { return contents_; }
+  const std::string& name() const { return name_; }
+
+private:
+  std::string name_;
+  std::string contents_;
+};
+
 class WT_API Configuration
 {
 public:
@@ -129,6 +145,11 @@ public:
     NoErrors, /* do not even catch them */
     ServerSideOnly,
     ErrorMessage
+  };
+
+  enum ClientSideErrorReportLevel {
+    Framework, /* exclude inline JavaScript and additional scripts, not part of Wt's framework */
+    All
   };
 
   enum BootstrapMethod {
@@ -176,6 +197,7 @@ public:
 
   const std::vector<MetaHeader>& metaHeaders() const { return metaHeaders_; }
   const std::vector<HeadMatter>& headMatter() const { return headMatter_; }
+  const std::vector<HttpHeader>& httpHeaders() const { return httpHeaders_; }
   SessionPolicy sessionPolicy() const;
   int numProcesses() const;
   int numThreads() const;
@@ -196,6 +218,7 @@ public:
   int serverPushTimeout() const;
   std::string valgrindPath() const;
   ErrorReporting errorReporting() const;
+  ClientSideErrorReportLevel clientSideErrorReportingLevel() const;
   bool debug() const;
   std::string runDirectory() const;
   int sessionIdLength() const;
@@ -257,6 +280,9 @@ public:
   bool useSlashExceptionForInternalPaths() const;
   bool needReadBodyBeforeResponse() const;
   bool webglDetect() const;
+  bool useScriptNonce() const;
+  bool delayLoadAtBoot() const;
+  bool useXFrameSameOrigin() const;
 
   bool agentIsBot(const std::string& agent) const;
   bool agentSupportsAjax(const std::string& agent) const;
@@ -323,6 +349,7 @@ private:
   int             serverPushTimeout_;
   std::string     valgrindPath_;
   ErrorReporting  errorReporting_;
+  ClientSideErrorReportLevel clientSideErrorReportLevel_;
   std::string     runDirectory_;
   int             sessionIdLength_;
   PropertyMap     properties_;
@@ -345,6 +372,7 @@ private:
   bool            sessionIdCookie_;
   bool            cookieChecks_;
   bool            webglDetection_;
+  bool            delayLoadAtBoot_;
   int             numSessionThreads_;
 
   std::vector<std::string> allowedOrigins_;
@@ -352,6 +380,9 @@ private:
   std::vector<BootstrapEntry> bootstrapConfig_;
   std::vector<MetaHeader> metaHeaders_;
   std::vector<HeadMatter> headMatter_;
+  bool useXFrameSameOrigin_;
+  std::vector<HttpHeader> httpHeaders_;
+  bool useScriptNonce_;
 
   bool connectorSlashException_;
   bool connectorNeedReadBody_;

@@ -29,6 +29,8 @@ public:
 
   virtual bool isSynchronous() const;
 
+  bool supportsTransferWebSocketResourceSocket() override { return false; }
+
   virtual void flush(ResponseState state = ResponseState::ResponseDone,
                      const WriteCallback& callback = WriteCallback());
 
@@ -40,12 +42,16 @@ public:
   virtual std::ostream& err() { return err_; }
 
   virtual void setStatus(int status);
+  int status() override;
 
   virtual void setContentLength(::int64_t length);
 
   virtual void setContentType(const std::string& value);
 
   virtual void addHeader(const std::string& name, const std::string& value);
+
+  //! This is a clone of addHeader, unlike the virtual method specifies.
+  void insertHeader(const std::string& name, const std::string& value) override;
 
   virtual void setRedirect(const std::string& url);
 

@@ -7,15 +7,15 @@
 #include <stdlib.h>
 
 #include <boost/algorithm/string.hpp>
-#include <boost/filesystem/operations.hpp>
-#include <boost/filesystem/convenience.hpp>
 
 #include <Wt/WApplication.h>
 #include <Wt/WText.h>
 #include <Wt/WImage.h>
 
+#include <Wt/cpp17/filesystem.hpp>
+
 using namespace Wt;
-namespace fs = boost::filesystem;
+namespace fs = cpp17::filesystem;
 
 SourceView::SourceView(ItemDataRole fileNameRole,
                        ItemDataRole contentRole,
@@ -100,7 +100,7 @@ std::unique_ptr<WWidget> SourceView::renderView()
     // no content
     auto result = std::make_unique<WText>();
     result->setInline(false);
-    return std::move(result);
+    return result;
   }
 
   /*
@@ -197,7 +197,7 @@ std::unique_ptr<WWidget> SourceView::renderView()
   result->setInline(false);
   WApplication::instance()
     ->doJavaScript(result->jsRef() + ".parentNode.scrollTop = 0;");
-  return std::move(result);
+  return result;
 }
 
 std::string SourceView::imageExtension(const std::string& fileName)
@@ -207,7 +207,7 @@ std::string SourceView::imageExtension(const std::string& fileName)
   };
 
   fs::path p(fileName);
-  std::string extension = fs::extension(p);
+  std::string extension = p.extension().string();
 
   for (const char **s = imageExtensions; *s != 0; ++s)
     if (*s == extension)

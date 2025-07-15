@@ -7,6 +7,7 @@ INCLUDE_DIRECTORIES(
   ${CMAKE_CURRENT_BINARY_DIR} # for WConfig.h
   ${BOOST_INCLUDE_DIRS}
   Wt/Dbo/backend/amalgamation # for sqlite3.h
+  ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/qrcodegen # QR code generation for MFA
 )
 
 LINK_DIRECTORIES(${BOOST_LIB_DIRS})
@@ -195,6 +196,8 @@ Wt/WPaintedWidget.h Wt/WPaintedWidget.C
 Wt/WPainter.h Wt/WPainter.C
 Wt/WPainterPath.h Wt/WPainterPath.C
 Wt/WPanel.h Wt/WPanel.C
+Wt/WPasswordEdit.h Wt/WPasswordEdit.C
+Wt/WPasswordValidator.h Wt/WPasswordValidator.C
 Wt/WPen.h Wt/WPen.C
 Wt/WPoint.h Wt/WPoint.C
 Wt/WPointF.h Wt/WPointF.C
@@ -203,6 +206,7 @@ Wt/WPopupMenu.h Wt/WPopupMenu.C
 Wt/WPopupWidget.h Wt/WPopupWidget.C
 Wt/WProgressBar.h Wt/WProgressBar.C
 Wt/WPushButton.h Wt/WPushButton.C
+Wt/WQrCode.h Wt/WQrCode.C
 Wt/WRadioButton.h Wt/WRadioButton.C
 Wt/WRandom.h Wt/WRandom.C
 Wt/WReadOnlyProxyModel.h Wt/WReadOnlyProxyModel.C
@@ -222,6 +226,7 @@ Wt/WSplitButton.h Wt/WSplitButton.C
 Wt/WSound.h Wt/WSound.C
 Wt/WSslCertificate.h Wt/WSslCertificate.C
 Wt/WSslInfo.h Wt/WSslInfo.C
+Wt/WStackedValidator.h Wt/WStackedValidator.C
 Wt/WStackedWidget.h Wt/WStackedWidget.C
 Wt/WStandardItem.h Wt/WStandardItem.C
 Wt/WStandardItemModel.h Wt/WStandardItemModel.C
@@ -267,14 +272,22 @@ Wt/WVideo.h Wt/WVideo.C
 Wt/WVmlImage.h Wt/WVmlImage.C
 Wt/WViewWidget.h Wt/WViewWidget.C
 Wt/WVirtualImage.h Wt/WVirtualImage.C
+Wt/WWebSocketConnection.h Wt/WWebSocketConnection.C
+Wt/WWebSocketResource.h Wt/WWebSocketResource.C
 Wt/WWebWidget.h Wt/WWebWidget.C
 Wt/WWidget.h Wt/WWidget.C
 Wt/WWidgetItem.h Wt/WWidgetItem.C
 Wt/WWidgetItemImpl.h Wt/WWidgetItemImpl.C
+thirdparty/qrcodegen/QrCode.hpp thirdparty/qrcodegen/QrCode.cpp
+Wt/Auth/Mfa/AbstractMfaProcess.h Wt/Auth/Mfa/AbstractMfaProcess.C
+Wt/Auth/Mfa/Totp.h Wt/Auth/Mfa/Totp.C
+Wt/Auth/Mfa/TotpProcess.h Wt/Auth/Mfa/TotpProcess.C
+Wt/Auth/Mfa/TotpQrCode.h Wt/Auth/Mfa/TotpQrCode.C
 Wt/Auth/AbstractPasswordService.h Wt/Auth/AbstractPasswordService.C
 Wt/Auth/AbstractUserDatabase.h Wt/Auth/AbstractUserDatabase.C
 Wt/Auth/AuthModel.h Wt/Auth/AuthModel.C
 Wt/Auth/AuthService.h Wt/Auth/AuthService.C
+Wt/Auth/AuthThrottle.h Wt/Auth/AuthThrottle.C
 Wt/Auth/AuthWidget.h Wt/Auth/AuthWidget.C
 Wt/Auth/FacebookService.h Wt/Auth/FacebookService.C
 Wt/Auth/FormBaseModel.h Wt/Auth/FormBaseModel.C
@@ -399,6 +412,7 @@ web/XSSFilter.h web/XSSFilter.C
 web/XSSUtils.h web/XSSUtils.C
 web/SslUtils.h web/SslUtils.C
 web/UriUtils.h web/UriUtils.C
+web/base32.h web/base32.cpp
 web/base64.h web/base64.cpp
 Plain_html.C
 Boot_html.C
@@ -591,6 +605,12 @@ IF(ENABLE_LIBWTTEST)
           LIBRARY DESTINATION ${LIB_INSTALL_DIR}
           ARCHIVE DESTINATION ${LIB_INSTALL_DIR})
 
+  if(MSVC AND SHARED_LIBS)
+    install(FILES $<TARGET_PDB_FILE:wttest>
+            DESTINATION bin
+            OPTIONAL)
+  endif()
+
   INSTALL(EXPORT wt-target-test
           DESTINATION ${CMAKE_INSTALL_DIR}/wt
           NAMESPACE Wt::)
@@ -687,11 +707,22 @@ ENDIF(MULTI_THREADED_BUILD)
 TARGET_INCLUDE_DIRECTORIES(wt INTERFACE
   $<INSTALL_INTERFACE:include>)
 
+INSTALL(FILES
+    thirdparty/qrcodegen/QrCode.hpp
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/thirdparty/qrcodegen
+)
+
 INSTALL(TARGETS wt
     EXPORT wt-target-wt
     RUNTIME DESTINATION bin
     LIBRARY DESTINATION ${LIB_INSTALL_DIR}
     ARCHIVE DESTINATION ${LIB_INSTALL_DIR})
+
+if(MSVC AND SHARED_LIBS)
+  install(FILES $<TARGET_PDB_FILE:wt>
+          DESTINATION bin
+          OPTIONAL)
+endif()
 
 INSTALL(EXPORT wt-target-wt
         DESTINATION ${CMAKE_INSTALL_DIR}/wt

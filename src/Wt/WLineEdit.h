@@ -28,6 +28,42 @@ enum class InputMaskFlag {
   KeepMaskWhileBlurred = 0x1 //!< Keep the input mask when blurred
 };
 
+/*! \brief Enumeration that describes different autocomplete modes.
+ *
+ * The autocomplete mode tells the browser what type of information is
+ * required by the field. This helps the browser to complete the field
+ * for the user.
+ *
+ * \sa setAutoComplete(AutoCompleteMode)
+ */
+enum class AutoCompleteMode {
+  Off, //!< Forbid the browser to automatically enter or select values. \note In most modern browsers, this will not stop password manager to do it.
+  On, //!< The browser will "guess" what type of data is required.
+  NewPassword, //!< A new password. This should be used with field for entering a new password or confirming the new password.
+  CurrentPassword, //!< The current password of the user.
+  Username //!< An accout name or username.
+};
+
+/*! \brief Enumeration that describes different input modes.
+ *
+ * The input mode tells the browser what layout should be used for a
+ * virtual keybord when editing this field. This mainly impacts phone
+ * users.
+ *
+ * \sa setInputMode(InputMode)
+ */
+enum class InputMode {
+  Off, //!< Does not specify any input mode to the browser
+  None, //!< No virtual keyboard should be displayed.
+  Text, //!< The locale-specific standard virtual keyboard.
+  Tel, //!< A numeric virtual keyboard wich also have "#"" and "*".
+  Url, //!< Ensure that the virtual keyboard has "/"
+  Email, //!< Ensure that the virtual keyboard has "@"
+  Numeric, //!< Ensure that the virtual keyboard has the digit from 0 to 9. Does usually show only the numbers with maybe also "-" .
+  Decimal, //!< Like Numeric + ensure that the virtual keyboard has the decimal separator.
+  Search //!< A virtual keyboard convenient for search
+};
+
 /*! \class WLineEdit Wt/WLineEdit.h Wt/WLineEdit.h
  *  \brief A widget that provides a single line edit.
  *
@@ -134,7 +170,7 @@ public:
    *
    * The default value is -1.
    */
-  void setMaxLength(int length);
+  virtual void setMaxLength(int length);
 
   /*! \brief Returns the maximum length of text that can be entered.
    *
@@ -145,13 +181,19 @@ public:
   /*! \brief Sets the echo mode.
    *
    * The default echo mode is Normal.
+   *
+   * \deprecated For EchoMode::Password, use WPasswordEdit instead.
    */
+  WT_DEPRECATED("For EchoMode::Password, use WPasswordEdit instead.")
   void setEchoMode(EchoMode echoMode);
 
   /*! \brief Returns the echo mode.
    *
+   * \deprecated For EchoMode::Password, use WPasswordEdit instead.
+   *
    * \sa setEchoMode(EchoMode)
    */
+  WT_DEPRECATED("For EchoMode::Password, use WPasswordEdit instead.")
   EchoMode echoMode() const { return echoMode_; }
 
   /*! \brief Sets (built-in browser) autocomplete support.
@@ -164,11 +206,46 @@ public:
    */
   void setAutoComplete(bool enabled);
 
+  /*! \brief Sets (built-in browser) autocomplete support.
+   *
+   * Depending on the user agent, this may assist the user in filling in
+   * text for common input fields (e.g. address information) based on
+   * some heuristics.
+   *
+   * The default value is AutoCompleteMode::On.
+   */
+  void setAutoComplete(AutoCompleteMode token);
+
+  /*! \brief Returns if auto-completion support is not off.
+   *
+   * \sa setAutoComplete()
+   */
+  bool autoComplete() const { return autoComplete_ != AutoCompleteMode::Off; }
+
   /*! \brief Returns auto-completion support.
    *
    * \sa setAutoComplete()
    */
-  bool autoComplete() const { return autoComplete_; }
+  AutoCompleteMode autoCompleteToken() const { return autoComplete_; }
+
+  /*! \brief Sets (built-in browser) input mode support.
+   *
+   * The input mode suggest what type of virtual keyboard should
+   * be used when applicable (mainly for phone users).
+   *
+   * When InputMode::Off is used, the inputmode field is not specified.
+   * Not to be confused with InputMode::None, which suggest the browser to
+   * not use any virtual keybord.
+   *
+   * The default value is InputMode::Off.
+   */
+  void setInputMode(InputMode mode);
+
+  /*! \brief Returns inputMode support.
+   *
+   * \sa setInputMode()
+   */
+  InputMode inputMode() const { return inputMode_; }
 
   /*! \brief Returns the current selection start.
    *
@@ -313,20 +390,22 @@ public:
 private:
   static const char *INPUT_SIGNAL;
 
-  WT_USTRING content_;
-  WT_USTRING displayContent_;
-  int        textSize_;
-  int        maxLength_;
-  EchoMode   echoMode_;
-  bool       autoComplete_;
+  WT_USTRING        content_;
+  WT_USTRING        displayContent_;
+  int               textSize_;
+  int               maxLength_;
+  EchoMode          echoMode_;
+  AutoCompleteMode autoComplete_;
+  InputMode         inputMode_;
 
-  static const int BIT_CONTENT_CHANGED    = 0;
-  static const int BIT_TEXT_SIZE_CHANGED  = 1;
-  static const int BIT_MAX_LENGTH_CHANGED = 2;
-  static const int BIT_ECHO_MODE_CHANGED  = 3;
-  static const int BIT_AUTOCOMPLETE_CHANGED  = 4;
+  static const int BIT_CONTENT_CHANGED        = 0;
+  static const int BIT_TEXT_SIZE_CHANGED      = 1;
+  static const int BIT_MAX_LENGTH_CHANGED     = 2;
+  static const int BIT_ECHO_MODE_CHANGED      = 3;
+  static const int BIT_AUTOCOMPLETE_CHANGED   = 4;
+  static const int BIT_INPUT_MODE_CHANGED     = 5;
 
-  std::bitset<5> flags_;
+  std::bitset<6> flags_;
 
   static const std::string SKIPPABLE_MASK_CHARS;
 
@@ -369,6 +448,13 @@ protected:
   virtual int boxBorder(Orientation orientation) const override;
 
   virtual void render(WFlags<RenderFlag> flags) override;
+  /*! \internal
+   * \brief Returns the value of the type attribute for the <input> element
+   *
+   * For WLineEdit this is normally "text" or "password", but this can be overridden by
+   * derived classes, e.g. for a native WTimeEdit this would be "time".
+   */
+  WT_NODISCARD virtual std::string type() const noexcept;
 };
 
 }

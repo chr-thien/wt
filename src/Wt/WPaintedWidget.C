@@ -193,6 +193,12 @@ void WPaintedWidget::update(WFlags<PaintFlag> flags)
   repaint();
 }
 
+void WPaintedWidget::refresh()
+{ 
+  update();
+  WInteractWidget::refresh();
+}
+
 void WPaintedWidget::enableAjax()
 {
   if (dynamic_cast<WWidgetCanvasPainter *>(painter_.get())
@@ -454,7 +460,7 @@ void WPaintedWidget::propagateRenderOk(bool deep)
 }
 
 void WPaintedWidget::getDomChanges(std::vector<DomElement *>& result,
-                                   WApplication *app)
+                                   WT_MAYBE_UNUSED WApplication* app)
 {
   DomElement *e = DomElement::getForUpdate(this, DomElementType::DIV);
   updateDom(*e, false);
@@ -761,7 +767,7 @@ WWidgetRasterPainter::~WWidgetRasterPainter()
 { }
 
 std::unique_ptr<WPaintDevice> WWidgetRasterPainter
-::createPaintDevice(bool paintUpdate)
+::createPaintDevice(WT_MAYBE_UNUSED bool paintUpdate)
 {
 #ifdef WT_HAS_WRASTERIMAGE
   return std::unique_ptr<WPaintDevice>
@@ -802,8 +808,6 @@ void WWidgetRasterPainter::createContents
   img->setAttribute("height", hstr);
   img->setAttribute("class", "unselectable");
   img->setAttribute("unselectable", "on");
-  img->setAttribute("onselectstart", "return false;");
-  img->setAttribute("onmousedown", "return false;");
 
   WResource *resource = dynamic_cast<WResource *>(device.get());
   img->setAttribute("src", resource->generateUrl());
@@ -811,6 +815,16 @@ void WWidgetRasterPainter::createContents
   result->addChild(img);
 
   device_ = std::move(device);
+
+  // All event handlers ought to be JS, not DOM: #13501
+  WStringStream selectJS;
+  selectJS << WT_CLASS << ".$('" << "i" << widget_->id() << "').onselectstart = "
+           << "function() { return false; };";
+  Wt::WApplication::instance()->doJavaScript(selectJS.str());
+  WStringStream mouseJS;
+  mouseJS << WT_CLASS << ".$('" << "i" << widget_->id() << "').onmousedown = "
+           << "function() { return false; };";
+  Wt::WApplication::instance()->doJavaScript(mouseJS.str());
 }
 
 void WWidgetRasterPainter

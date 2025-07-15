@@ -20,6 +20,718 @@ newer version of Wt. It lists changes in the library that may break
 the way you build Wt, the way you configure Wt or the Wt API and
 behaviour.
 
+<h2>Release 4.12.0 (TBD)</h2>
+
+<p>Wt 4.12.0 is a major release that introduces the following new features:</p>
+
+<ul>
+  <li>
+    <a href="https://redmine.emweb.be/issues/7450" target="_blank">Issue #7450</a>:
+    Added the option to use <code>std::filesystem</code> instead of <code>boost::filesystem</code> by setting the cache variable <code>WT_CPP17_FILESYSTEM_IMPLEMENTATION</code> to <code>std</code> instead of <code>boost</code>.
+    Accessing the last time a file was updated with std::filesystem before C++20 may result in an imprecise time point.
+  </li>
+  <li>
+    <a href="https://redmine.webtoolkit.eu/issues/7228" target="_blank">Issue #7228</a>:
+    Wt now supports native HTML5 input types for <a href="classWt_1_1WDateTime.html" target="_blank">WDateEdit</a> and <a href="classWt_1_1WTimeEdit.html" target="_blank">WTimeEdit</a>.
+    You can enable it by using <a href="classWt_1_1WDateEdit.html#a388105e077d60a7225564572cae51a93" target="_blank">WDateEdit::setNativeControl(true)</a> or
+    <a href="classWt_1_1WTimeEdit.html#a747741116664abc07f820122d05a535f" target="_blank">WTimeEdit::setNativeControl(true)</a>
+    for <code>WDateEdit</code> and <code>WTimeEdit</code> respectively. Both are set to false by default.
+    Native controls will use the locale of the browser to determine the format displayed to the client.
+    They have a better responsive design than Wt's widgets, often deferring to a pop-up on small screens for example.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/12789" target="_blank">Issue #12789</a>:
+    this feature allows you to force the tooltip from a
+    <a href="classWt_1_1WWebWidget.html">WWebWidget</a> to be shown by calling
+    <a href="classWt_1_1WWebWidget.html#a85571804f5b1c3b15e1ecafc4259bfcd" target="_blank">WWebWidget::showToolTip()</a>. Tooltips can still be shown when a
+    <a href="classWt_1_1WWebWidget.html">WWebWidget</a> is hovered over by the mouse with
+    <a href="classWt_1_1WWebWidget.html#a7f1b8701997fcc45dcf55bc3566c1380" target="_blank">WWebWidget::showToolTipOnHover()</a>. The latter is default behavior.
+    If both options are enabled, the tooltip on hover will not be shown. Rather the forcibly shown tooltip will remain visible throughout.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/4948" target="_blank">Issue #4948</a>:
+    The style of the collapse icon of collapsible <a href="classWt_1_1WPanel.html" target="_blank">WPanel</a>s
+    is now defined in CSS by styling the <code>Wt-collapse-button</code> style class.
+    IMPORTANT: the collapse icon will not be visible when using a custom theme that does not
+    define a styling for the <code>Wt-collapse-button</code> style class.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/12881" target="_blank">Issue #12881</a>:
+    added
+    <a href="classWt_1_1WPasswordEdit.html" target="_blank">WPasswordEdit</a> which ought to replace
+    <a href="classWt_1_1WLineEdit.html#a27c9bc232bea0ab76ee266be3325a10e" target="_blank">WLineEdit::setEchoMode(EchoMode::Password)</a>
+    that is now deprecated. You can find examples on how to use this new class in the
+    <a href="https://www.webtoolkit.eu/forms/password" target="_blank">Widget Gallery</a>.
+
+    It is also now possible to set the input mode of any
+    <a href="classWt_1_1WLineEdit.html" target="_blank">WLineEdit</a> using
+    <a href="classWt_1_1WLineEdit.html#a5d772a843fb12447da0e295e6fae805b" target="_blank">WLineEdit::setInputMode()</a>.
+    This is especially important for mobile devices, where the input mode impacts the
+    keyboard that is shown to the user when the input field is focused.
+
+    In addition, it is now possible to combine multiple
+    <a href="classWt_1_1WValidator.html" target="_blank">WValidator</a>s into a single one,
+    using the new
+    <a href="classWt_1_1WStackedValidator.html" target="_blank">WStackedValidator</a>.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/12817" target="_blank">Issue #12817</a>:
+    allows custom implementation of the scope and the authorization endpoint of the
+    <a href="classWt_1_1Auth_1_1OAuthProcess.html" target="_blank">Auth::OAuthProcess</a> by overriding
+    <a href="classWt_1_1Auth_1_1OAuthProcess.html#a0abac41f14450571445d1c82e9dba4cc" target="_blank">Auth::OAuthProcess::scope()</a> and
+    <a href="classWt_1_1Auth_1_1OAuthProcess.html#a8dc8be6709ce345220a05714a9665dae" target="_blank">Auth::OAuthProcess::authorizationEndpoint()</a>.
+    This will allow developers to reuse the <a href="classWt_1_1Auth_1_1OAuthService.html" target="_blank">OAuthService</a> for near-identical authentication calls.
+  </li>
+</ul>
+
+<p>Wt 4.12.0 also fixes the following bugs:</p>
+
+<ul>
+  <li>
+    <a href="https://redmine.emweb.be/issues/13701" target="_blank">Issue #13701</a>:
+    checked the index's validity on changing the <a href="classWt_1_1WMenu.html" target="_blank">WMenu</a>, when using a
+    <a href="classWt_1_1WStackedWidget.html" target="_blank">WStackedWidget</a> to display content.
+    Unselecting the previous item uses a set <code>-1<code> index, which the <code>WStackedWidget</code> omitted to validate.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/13699" target="_blank">Issue #13699</a>:
+    added the <a href="namespaceWt.html#a1709f88923d174d4a9d27271d3e30f28" target="_blank">Wt::TextFormat::None</a> option.
+    This allows for widgets to specify the <code>none</code> value in the <code>text-decoration</code> attribute.
+    This used to be unavailable, in lieu of <a href="classWt_1_1WFlags.html#a866ce1716c87b4c1f47b3021b0805ace" target="_blank">Wt::None</a>,
+    which rendered the "default" <code>text-decoration</code>, not allowing widget-specific control in case of CSS rules applying to the widget.
+  </li>
+</ul>
+
+<p>Wt 4.12.0 also addresses the following issues:</p>
+
+<ul>
+  <li>
+    <a href="https://redmine.emweb.be/issues/13712" target="_blank">Issue #13712</a>:
+    corrected the styling of <a href="classWt_1_1ItemDataRole.html#a4f39ded746ca62ea63ed222f2b852cf6" target="_blank">ItemDataRole::Link</a>
+    items in a <a href="classWt_1_1WTableView.html" target="_blank">WTableView</a>, in case
+    <a href="classWt_1_1WTableView.html#aef48a94558cded7916e33e8bbc69a89d" target="_blank">alternating row colors are enabled</a>.
+  </li>
+</ul>
+
+<p>Wt 4.12.0 also comes with the following improvements:</p>
+
+<ul>
+  <li>
+    <a href="https://redmine.emweb.be/issues/13703" target="_blank">Issue #13703</a>:
+    corrected a closing bracket, so that alignment is properly passed to <a href="classWt_1_1WToolBar.html#ac570073c5f31772125b3329465508318" target="_blank">WToolBar::addWidget()</a>.
+  </li>
+  <li>
+    <a href="https://redmine.webtoolkit.eu/issues/13301" target="_blank">Issue #13301</a>:
+    Added the possibility to handle all JavaScript errors inside Wt, also of scripts not directly related to Wt.
+    This can be done by setting the new <code>debug-level</code> option in the <code>wt_config.xml</code> file to <code>all</code>.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/11272" target="_blank">Issue #11272</a>:
+    Add support for TinyMCE 5, 6 and 7. Wt now assumes TinyMCE 6 is used by default instead of TinyMCE 3,
+    and the TinyMCE version bundled in Wt's Windows binaries has been updated to TinyMCE 6.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/11249" target="_blank">Issue #11249</a>:
+    It is now possible to set placeholder text in
+    <a href="classWt_1_1WTextEdit.html" target="_blank">WTextEdit</a> when using TinyMCE 5 or higher.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/11267" target="_blank">Issue #11267</a>:
+    It is now possible to change the readonly state of a
+    <a href="classWt_1_1WTextEdit.html" target="_blank">WTextEdit</a> when using TinyMCE 5 or higher.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/12801" target="_blank">Issue #12801</a>:
+    ensured that calling <a href="classWt_1_1WLeafletMap.html#a9263f7ce85484a91034c39484c68fda5" target="_blank">WLeafletMap::removeMarker()</a>
+    and <a href="classWt_1_1WLeafletMap.html#a1d75431893349d8b9d707a0cdb1d41ec" target="_blank">WLeafletMap::addMarker()</a> using the same
+    <code>unique_ptr<Marker></code>, and performing changes to it will result in the update taking place.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/13163" target="_blank">Issue #13163</a>:
+    Improve the way touch selection works for
+    <a href="classWt_1_1WTableView.html" target="_blank">WTableView</a>. The selection of a single element will now
+    happen only after the user stopped touching the screen, to avoid selection happening while scrolling slowly.
+    Also, selection of multiple elements will now be cancel when moving the finger. This will avoid selection of
+    multiple elements happening while zooming.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/13711" target="_blank">Issue #13711</a>:
+    Removed the usage of URLs ending with '.'. These were sometimes (not for all requests) found in case no path
+    information was present, indicating the root.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/13700" target="_blank">Issue #13700</a>:
+    installed the generated PDB files next to the DLLs on Windows (shared) builds.
+  </li>
+</ul>
+
+<h2>Release 4.11.4 (April 3, 2025)</h2>
+
+<p>
+  Wt 4.11.4 is a patch release that addresses the following issues:
+</p>
+
+<ul>
+  <li>
+    <a href="https://redmine.emweb.be/issues/13600" target="_blank">Issue #13600</a>:
+    fixed CSP (Content Security Policy) violations in case of <code>use-script-nonce</code> being enabled, for
+    <a href="classWt_1_1WAnchor.html" target="_blank">WAnchor</a> and
+    <a href="classWt_1_1WAbstractArea.html" target="_blank">WAbstractArea</a> without a link. The default browser behavior is now disabled on all events
+    coming from those widgets as long as they have no link, and their href attribute is set to <code>#</code>.
+    Additionally, fixed
+    <a href="classWt_1_1WAbstractArea.html" target="_blank">WAbstractArea</a> sometimes trying to use it's href to send click event when ajax
+    was available.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/13542" target="_blank">Issue #13542</a>:
+    fixed the <code>--accesslog</code> option having no effect. The description of this option
+    was also updated to reflect its actual behavior. Additionally, access logs now have
+    their own type ("access") instead of the generic "info" type. These logs now also have a format more consistent with other logs.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/13376" target="_blank">Issue #13376</a>:
+    fixed an issue where attempting to hide a
+    <a href="classWt_1_1WPopupMenu.html" target="_blank">WPopupMenu</a>
+    would sometimes be display the popup at the bottom of the page instead of actually hiding the popup.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/13567" target="_blank">Issue #13567</a>:
+    fixed the handling of <code>SessionProcess::read()</code>, such that it is always called on existing asio context.
+    This was an edge-case when using <code>dedicated-process</code> mode.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/13585" target="_blank">Issue #13585</a>:
+    resolved a segfault when a <a href="classWt_1_1WMenu.html" target="_blank">WMenu</a>
+    would be selected. The selection would happen based on the internal path, with the item having no content, but having a submenu (using
+    <a href="classWt_1_1WMenu.html#a792efe0a20114142b568a3e0f25dbcb2" target="_blank">WMenu::addMenu()</a>).
+    Additionally, the <a href="classWt_1_1WStackedWidget.html#a8342aac06b58cdedb7b1f43132673cb8" target="_blank">currentWidgetChanged()</a>
+    signal now only emits once if the <a href="classWt_1_1WStackedWidget.html" target="_blank">WStackedWidget</a>'s
+    content has changed.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/13621" target="_blank">Issue #13621</a>:
+    ensured that <code>thirdparty/qrcodegen/QrCode.hpp</code> is installed in the include directory, and that the <code>TotpQrCode</code> symbol is exported.
+    This allows developers to use the <a href="classWt_1_1Auth_1_1Mfa_1_1TotpQrCode.html" target="_blank">Auth::Mfa::TotpQrCode</a> class in their own code.
+    Additionally, <a href="classWt_1_1Auth_1_1Mfa_1_1TotpQrCode.html#a59c9cdfce092a5385daf010fceb3361e" target="_blank">Auth::Mfa::TotpQrCode::formatKey()</a> is now public.
+    This allows developers to retrieve correct URI, which could be shown to end users, and allow them to copy it to a password manager.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/13631" target="_blank">Issue #13631</a>:
+    added the "Logout"/"Back" button from <a href="https://redmine.emweb.be/issues/13392" target="_blank">Issue #13392</a>
+    to the <a href="classWt_1_1WBootstrap3Theme.html" target="_blank">WBootstrap3Theme</a> as well.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/13626" target="_blank">Issue #13626</a>:
+    ensured that <a href="classWt_1_1Auth_1_1AuthWidget.html#a7e64d84a1717f437fa9a32d5901ca411" target="_blank">Auth::AuthWidget::processEnvironment()</a> will also process the MFA environment.
+    This results in MFA tokens being processed before the authentication widget is rendered.
+    </a>
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/13550" target="_blank">Issue #13550</a>:
+    resolved an issue that would change the href of internal path links in
+    <a href="classWt_1_1WTemplate.html" target="_blank">WTemplate</a> or
+    <a href="classWt_1_1WText.html" target="_blank">WText</a> to the current
+    internal path if internal path encoding was enabled.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/13511" target="_blank">Issue #13511</a>:
+    fixed a bug where a
+    <a href="classWt_1_1WPushButton.html" target="_blank">WPushButton</a> rendered as an anchor
+    with the <a href="classWt_1_1WBootstrap5Theme" target="_blank">WBootstrap5Theme</a>,
+    would sometimes change its class property to a <code>dropdown-item</code> on update.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/13373" target="_blank">Issue #13373</a>:
+    resolved an issue where
+    <a href="classWt_1_1WPaintedWidget.html" target="_blank">WPaintedWidget</a> would not be updated when
+    <a href="classWt_1_1WApplication.html#a02b9d8aa1b6c2d0dc9edc1b9c63f86dc">WApplication::refresh()</a> was called.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/12288" target="_blank">Issue #12288</a>:
+    corrected a JavaScript error when using <a href="namespaceWt.html#aeb0e4f49ce4a28d8ce9b0c6005027876" target="_blank">Wt::LayoutImplementation::Flex</a>
+    with a disabled ancestor widget.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/13685" target="_blank">Issue #13685</a>:
+    limited the possible size calculations in stretchable layouts that could loop infinitely.
+    </a>
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/13510" target="_blank">Issue #13510</a>:
+    fixed the crosshair coordinates in
+    <a href="classWt_1_1Chart_1_1WCartesianChart.html" target="_blank">Chart::WCartesianGraph</a>
+    showing dates as double.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/13067" target="_blank">Issue #13067</a>:
+    corrected the internal path being sent in the request URL after changing the session ID for applications deployed at a non-empty path.
+  </li>
+</ul>
+
+<p>
+  Wt 4.11.4 also comes with the following improvements:
+</p>
+
+<ul>
+  <li>
+    <a href="https://redmine.emweb.be/issues/13630" target="_blank">Issue #13630</a>:
+    allow more control over and customization for <a href="classWt_1_1Auth_1_1Mfa_1_1TotpProcess.html" target="_blank">TotpProcess</a>.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/13125" target="_blank">Issue #13125</a>:
+    added
+    <a href="classWt_1_1StdLayoutImpl.html" target="_blank">StdLayoutImpl</a> and
+    <a href="classWt_1_1StdLayoutItemImpl.html" target="_blank">StdLayoutItemImpl</a> to the public API.
+    These classes were already used by Wt to create layout but were not public. Since those classes are necessary to create a custom layout for a
+    <a href="classWt_1_1WContainerWidget.html" target="_blank">WContainerWidget</a>
+    it has now be made public to allow developers to create their own layouts. An example of a simple layout was also added in <code>examples/feature/custom_layout</code>.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/13075" target="_blank">Issue #13075</a>:
+    <a href="classWt_1_1WWidget.html#a2d627cbf964560995ac51c25d69d8b54" target="_blank">WWidget::positionAt()</a>
+    now correctly positions the widget over the given widget when there is not enough place on either
+    side to place the widget. This same issue affecting popups was resolved as well.
+    Since this potentially puts content over other widgets (e.g. when entering information into a
+    <a href="classWt_1_1WSuggestionPopup.html" target="_blank">WSuggestionPopup</a>), the options
+    <a href="classWt_1_1WPopupMenu.html#a47a35b9b9ff72ea1c9daf86897730bd3">WPopupMenu::setAdjust()</a> and
+    <a href="classWt_1_1WPopupWidget.html#a0c14602b64c0d1f5aea2429a5ec1b415">WPopupWidget::setAdjust()</a>
+    were added. This allows the default adjustment behaviour to be overridden, so that content is never
+    placed over the widget it popped up from.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/12870" target="_blank">Issue #12870</a>:
+    added the
+    <a href="classWt_1_1WQrCode.html" target="_blank">WQrCode</a> widget, a widget that can be used to generate QR codes.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/12944" target="_blank">Issue #12944</a>:
+    added documentation for the
+    <a href="classWt_1_1WIcon.html" target="_blank">WIcon</a> class.
+  </li>
+</ul>
+
+<h2>Release 4.11.3 (February 19, 2025)</h2>
+
+<p>
+  Wt 4.11.3 is a patch release that addresses the following issues:
+</p>
+
+<ul>
+  <li>
+    <a href="https://redmine.emweb.be/issues/13387" target="_blank">Issue #13387</a>:
+    fixed incorrect expiration date for an MFA authentication token being stored in the database.
+    Additionally, the possibility to give a custom expiration time for authentication tokens was added, for
+    <a href="classWt_1_1Auth_1_1AuthService.html#aa0c7e178c21d6fac659e4664b4cd865c" target="_blank">Auth::AuthService::createAuthToken()</a>.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/13481" target="_blank">Issue #13481</a>:
+    fixed a lingering cookie that <a href="classWt_1_1Auth_1_1AuthModel.html#a9186da13a4a2d9f2842db8e3d64bcce4" target="_blank">remembers the login</a>
+    (using "Remember me") was not correctly removed when the user logged out. It was correctly removed from the browser, but server-side a reference to it remained.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/13501" target="_blank">Issue #13501</a>:
+    fixed several instances of CSP (Content Security Policy) violations, in case of <code>use-script-nonce</code> being enabled.
+    The generated header <code>Content-Security-Policy: script-src 'nonce-{randomNonce}' 'strict-dynamic' 'unsafe-eval'</code>, does not allow <code>unsafe-inline</code>.
+    All instances of code that still produced inline handlers have been replaced with JavaScript handlers.
+    A nice side-effect is that this makes a lot of the DOM more readable.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/13261" target="_blank">Issue #13261</a>:
+    fixed
+    <a href="classWt_1_1WContainerWidget.html#a608f748cbdda763f1a11556ddad9fbe1" target="_blank">WContainerWidget::clear()</a> not correctly removing content when using layouts with JavaScript implementation.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/13361" target="_blank">Issue #13361</a>:
+    fixed a compilation issue with boost version 1.87.0 due to the use of deprecated boost::asio functions.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/13262" target="_blank">Issue #13262</a>:
+    fixed a race condition for shared sessions leading to several log entries being written on the same line.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/13466" target="_blank">Issue #13466</a>:
+    fixed <a href="classWt_1_1WViewWidget.html" target="_blank">WViewWidget</a>,
+    so that it now correctly replaces the old content with the new one when calling
+    <a href="classWt_1_1WViewWidget.html#a7dcbc05eb15c4d4168141871d5908e37" target="_blank">WViewWidget::update()</a>,
+    instead of appending the new content to the old content.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/13291" target="_blank">Issue #13291</a>:
+    fixed a bug where a nested
+    <a href="classWt_1_1WMenu.html" target="_blank">WMenu</a> could lead to a segfault.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/12831" target="_blank">Issue #12831</a>:
+    fixed a potential memory leak, when Dbo items reference each other cyclically.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/13507" target="_blank">Issue #13507</a>:
+    fixed enabled state propagation. In more complex layouts, where widgets would be reparented,
+    the enabled state could be wrongly assigned.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/13385" target="_blank">Issue #13385</a>:
+    fixed
+    <a href="classWt_1_1Auth_1_1Login.html#ab80cb200923961dbd1c6573b0845addb" target="_blank">Auth::Login::loggedIn()</a>
+    returning <code>true</code> if the user was logged out or still required MFA authentication.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/13517" target="_blank">Issue #13517</a>:
+    fixed a rendering edge-case with <a href="classWt_1_1WContainerWidget.html" target="_blank">WContainerWidget</a>,
+    which would result in a JavaScript error.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/13534" target="_blank">Issue #13534</a>:
+    fixed error code handling with socket cancel and close operations to ensure that the socket can be properly closed instead of throwing an exception in case of an asio error.
+  </li>
+</ul>
+
+<p>
+  Wt 4.11.3 also comes with the following improvements:
+</p>
+
+<ul>
+  <li>
+    <a href="https://redmine.emweb.be/issues/12383" target="_blank">Issue #12383</a>:
+    allows to configure
+    <a href="classWt_1_1Dbo_1_1Session.html#af3f253febb5c9d5d1b5b5a988af5db4e" target="_blank">Dbo::Session::setAllowNestedTransaction()</a>, (dis)allowing nested transactions.
+    While disabled, creating a nested transaction for this <code>Dbo::Session</code> will throw a
+    <a href="classWt_1_1Dbo_1_1Exception.html" target="_blank">Dbo::Exception</a>.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/12816" target="_blank">Issue #12816</a>:
+    add the possibility to change the item of
+    <a href="classWt_1_1Form_1_1Dbo_1_1FormModel.html" target="_blank">Wt::Form::Dbo::FormModel</a>, using
+    <a href="classWt_1_1Form_1_1Dbo_1_1FormModel.html#a143eba0045bc43e47213d847b9c0f3ff" target="_blank">Wt::Form::Dbo::FormModel::setItem()</a>.
+    This allows developers to update the view without recreating a new model.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/13392" target="_blank">Issue #13392</a>:
+    added a 'Back' button in TOTP setup and input view. This allows the user to logout in case they cannot
+    enter the code.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/13390" target="_blank">Issue #13390</a>:
+    disabled throttling during TOTP setup.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/13188" target="_blank">Issue #13188</a>:
+    add the possibility to customize the mapping between file extensions and MIME types. This is done by specifying the path to a CSV with the <code>--mime-map-append</code> or
+    <code>--mime-map-override</code> parameter in the run command or in the wthttp config file. This file must be a CSV file with two columns, the first column containing the
+    file extension and the second column containing the corresponding MIME type.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/13489" target="_blank">Issue #13489</a>:
+    in case server-side rendering is used for some <a href="classWt_1_1WPaintDevice.html" target="_blank">WPaintDevice</a>s,
+  the font metrics it constructs, are now only constructed once, and not once per <code>WPaintDevice</code>.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/13487" target="_blank">Issue #13487</a>:
+    added the function <a href="classWt_1_1Dbo_1_1FixedSqlConnectionPool.html#aa74bea0af636acc53ff8445d46dd9cf6" target="_blank">Dbo::FixedSqlConnectionPool::freeConnections()</a>
+    to retrieve how many connections in the pool are currently free.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/13491" target="_blank">Issue #13491</a>:
+    added more <code>addX</code> convenience methods that return the raw pointer of the added object.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/12117" target="_blank">Issue #12117</a>:
+    add a way to set an alternative count query with
+    <a href="classWt_1_1Dbo_1_1Query.html#ad65dd5e2432e1cf101716ef8a0e7d5df" target="_blank">Query::setCountQuery()</a>. This allows
+    to replace the default count query with a less expensive one.
+  </li>
+</ul>
+
+<h2>Release 4.11.2 (January 16, 2025)</h2>
+
+<p>
+  Wt 4.11.2 is a patch release that addresses the following issues:
+</p>
+
+<ul>
+  <li>
+    <a href="https://redmine.emweb.be/issues/12935" target="_blank">Issue #12935</a>:
+    resize handles in layouts now have a fixed height or width instead of them scaling with the spacing of the layout.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/10903" target="_blank">Issue #10903</a>:
+    add support for many common MIME types. Every file of the common types will now be sent with the correct MIME type instead of the default <code>application/octet-stream</code>.
+    The list comes from <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/MIME_types/Common_types" target="_blank">MDN</a> (taken on September 16, 2024), and is in no way exhaustive.
+    A way to provide more types will be added soon in <a href="https://redmine.emweb.be/issues/13188" target="_blank">Issue #13188</a>.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/12866" target="_blank">Issue #12866</a>:
+    added the <code>&lt;delay-load-at-boot&gt;</code> option which can be changed in the configuration file. This option
+    allows developers to choose whether the loading of the application at boot should be delayed or not. Instead of
+    immediately calling the loading method, a small delay is introduced to allow additional JavaScript to be executed before
+    loading. By default this option is set to true, which keeps the delay. This delay can cause the loading of the
+    application to take a long time in some very specific case. Setting this option to false could however impact any
+    JavaScript code added at boot time.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/13063" target="_blank">Issue #13063</a>:
+    fixed a bug where setting the HTML tag name of a
+    <a href="classWt_1_1WWebWidget.html" target="_blank">WWebWidget</a> could lead to a segmentation fault for some tag names.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/13366" target="_blank">Issue #13366</a>:
+    ensure that when the application's working directory and the docroot are not the same directory, the image rendering fallback
+    will attempt to resolve the image relative to both locations.
+    This is so that clients that do not have JavaScript enabled, are still able to see the same images as JavaScript-enabled clients.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/12860" target="_blank">Issue #12860</a>:
+    fixed a bug where a
+    <a href="classWt_1_1WDialog.html" target="_blank">WDialog</a> would not be centered if
+    <a href="classWt_1_1WDialog.html#a223f8635e38a6e9809b867f247b2185f" target="_blank">WDialog::exec()</a> was called after the <code>WDialog</code> was loaded.
+  </li>
+  <li>
+    <a href="https://redmine.webtoolkit.eu/issues/13082" target="_blank">Issue #13082</a>:
+    fixed styling of elements in layout not being updated in some cases if the change happened while the layout was hidden.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/12951" target="_blank">Issue #12951</a>:
+    fixed a bug where a layout in a
+    <a href="classWt_1_1WPanel.html" target="_blank">WPanel</a> may not work properly during and after some animations.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/12934" target="_blank">Issue #12934</a>:
+    fixed a bug in layouts using JavaScript implementation where a widget size could be set higher than it's maximum size, leading to additional space after that widget.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/13300" target="_blank">Issue #13300</a>:
+    fixed a missing fallback in Wt's main JavaScript, when handling browser history navigation (using the back and forward buttons).
+    In case of rewritten browser history, the retrieval would fail, and encounter an <code>undefined</code> state. Throwing a JavaScript error. This error should be guarded against,
+    and the fallback should always kick in.
+  </li>
+</ul>
+
+<p>
+  Wt 4.11.2 also comes with the following improvements:
+</p>
+
+<ul>
+  <li>
+    <a href="https://redmine.emweb.be/issues/13187" target="_blank">Issue #13187</a>:
+    add the possibility to configure headers that are sent in every reply. This can be defined in
+    the XML config using the <code>http-headers</code> tag.
+    It is now also possible to configure Wt to use nonces for script by setting the <code>use-script-nonce</code> to <code>true</code>,
+    to help protect against XSS attack. If you need to serve a script in a
+    <a href="classWt_1_1WResource.html" target="_blank">WResource</a>, the nonce is available through the
+    response parameter of the
+    <a href="classWt_1_1WResource.html#a3a740f8cc29e2e6e4e58defc9c88b8b6" target="_blank">WResource::handleRequest()</a> function by using
+    <a href="classWt_1_1Http_1_1Response.html#a5ade98a7d1e3edc76f4ffc7634a25298" target="_blank">Http::Response::nonce()</a>.
+    The nonce is facilitated through the <h href="https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP" target="_blank">CSP (Content Security Policy) header</a>.
+    Enabling the nonce will serve CSP headers in your responses. A minimal (fairly nonrestrictive) configuration is taken by default, namely:
+    <code>Content-Security-Policy: script-src 'nonce-{randomNonce}' 'strict-dynamic' 'unsafe-eval'</code>
+    This CSP header can be configured in the XML config under <code>http-headers</code> as well. If the nonce is enabled, only MORE restrictive CSP headers will
+    be allowed by the browser.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/12945" target="_blank">Issue #12945</a>:
+    allow to use icons from
+    <a href="http://fontawesome.io" target="_blank">Font Awesome</a> in
+    <a href="classWt_1_1WIconPair.html" target="_blank">WIconPair</a>. This can be done by giving the name of the icon instead of the URI to an image in the constructor. This also means that the icons can either be a
+    <a href="classWt_1_1WImage.html" target="_blank">WImage</a> or a
+    <a href="classWt_1_1WIcon.html" target="_blank">WIcon</a>. Accessing the icons of WIconPair using
+    <a href="classWt_1_1WIconPair.html#a2cb1d36dea7c7f0a145a0ac2e6c2ac0b" target="_blank">WIconPair::icon1()</a> and
+    <a href="classWt_1_1WIconPair.html#ab3a373c00c3ba582790c31f02f6caf6b" target="_blank">WIconPair::icon2()</a> is now deprecated in favor of
+    <a href="classWt_1_1WIconPair.html#a3e2e9c090569bc72e859cf05bdef16d7" target="_blank">WIconPair::uriIcon1()</a>,
+    <a href="classWt_1_1WIconPair.html#a9c70933778493df41c4332b0c6ed4943" target="_blank">WIconPair::uriIcon2()</a>,
+    <a href="classWt_1_1WIconPair.html#aba22073c807ad08ef1c5122d773573e8" target="_blank">WIconPair::iconNameIcon1()</a>, and
+    <a href="classWt_1_1WIconPair.html#a90d9fd8fe2e8f9d1ea20efa2098b4385" target="_blank">WIconPair::iconNameIcon2()</a>.
+  </li>
+  <li>
+    <a href="https://redmine.webtoolkit.eu/issues/13131" target="_blank">Issue #13131</a>:
+    make the refresh after
+    <a href="classWt_1_1WApplication.html#ac0f26388d68e9ebf5962c6bb477b4d83" target="_blank">WApplication::setLocale()</a> optional.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/6584" target="_blank">Issue #6584</a>:
+    add the <code>x-frame-same-origin</code> configuration option that allows to configure whether the header <code>X-Frame-Options: SAMEORIGIN</code> is used or not.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/8508" target="_blank">Issue #8508</a>:
+    make Wt use <code>std::chrono</code> for time zones by default when compiled with C++20 or higher, and allow automatic conversion of
+    <a href="classWt_1_1WTime.html" target="_blank">WTime</a>,
+    <a href="classWt_1_1WDateTime.html" target="_blank">WDateTime</a>,
+    <a href="classWt_1_1WDate.html" target="_blank">WDate</a> and
+    <a href="classWt_1_1WLocalDateTime.html" target="_blank">WLocalDateTime</a> from/to their <code>std::chrono</code> equivalent. In the case of <code>WDate</code> and <code>WLocalDateTime</code>,
+    it is only available if <code>std::chrono</code> is used for time zones.
+  </li>
+</ul>
+
+<h2>Release 4.11.1 (November 5, 2024)</h2>
+
+<p>
+  Wt 4.11.1 is a patch release that addresses the following issues:
+</p>
+
+<ul>
+  <li>
+    <a href="https://redmine.webtoolkit.eu/issues/12675" target="_blank">Issue #12675</a>:
+    Add built-in type support for
+    <a href="classWt_1_1Dbo_1_1JsonSerializer.html" target="_blank">Dbo::JsonSerializer</a>. This can be activated by including <code>Wt/Dbo/WtJsonSqlTraits.h</code>.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/13041" target="_blank">Issue #13041</a>:
+    Increase the default number of iteration of
+    <a href="classWt_1_1Auth_1_1BCryptHashFunction.html">Auth::BCryptHashFunction</a> to 12.
+    A warning message will also be logged when using Auth::BCryptHashFunction with less than the minumum of 10 iterations that ASVS recommends.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/11868" target="_blank">Issue #11868</a>:
+    Added the
+    <a href="classWt_1_1WStackedWidget.html#a8342aac06b58cdedb7b1f43132673cb8" target="_blank">WStackedWidget::currentWidgetChanged()</a> signal that is emitted when the
+    <a href="classWt_1_1WStackedWidget.html" target="_blank">WStackedWidget</a> changes the element that it shows.
+  </li>
+  <li>
+    <a href="https://redmine.webtoolkit.eu/issues/13106" target="_blank">Issue #13106</a>:
+    ensure that the correct <code>disabled</code> class is used on a per-theme basis. This wrongly affected all Bootstrap themes.
+  </li>
+  <li>
+    <a href="https://redmine.webtoolkit.eu/issues/13104" target="_blank">Issue #13104</a>:
+    a Bootstrap 5 <a href="classWt_1_1WDialog.html" target="_blank">WDialog</a>
+    is now correctly raised to the front when <a href="classWt_1_1WDialog.html#a113dd08d646491476342e5293c6e36f9" target="_blank">WDialog::raiseToFront()</a>
+    is called.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/12813" target="_blank">Issue #12813</a>:
+    Added the possibility for each column of
+    <a href="classWt_1_1WAbstractItemView.html" target="_blank">WAbstractItemView</a> to be set resizable or not independently using the
+    <a href="classWt_1_1WAbstractItemView.html#a737ab9af521bad7ea7c8acd85023bb66" target="_blank">WAbstractItemView::setColumnResizeEnabled()</a> function.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/11855" target="_blank">Issue #11855</a>:
+    the loading indicator should now be shown directly when the indicator-timeout is set to 0 instead of having a few millisecond delay.
+    This can be set by the <code>&lt;application-settings&gt;&lt;indicator-timeout&gt;0&lt;/indicator-timeout&gt;&lt;/application-settings&gt;</code> property in the <code>wt_config.xml</code>.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/7856" target="_blank">Issue #7856</a>:
+    Fix a bug where <code>change()</code> and <code>input()</code> signals would sometimes not be emitted by a
+    <a href="classWt_1_1WSlider.html" target="_blank">WSlider</a> with native control if progressive bootstrap was enabled.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/11001" target="_blank">Issue #11001</a>:
+    Delete the extra space that was sometimes added before the first and after last element of a
+    <a href="classWt_1_1WBoxLayout.html">WBoxLayout</a> if the spacing was more than twice as big as the margin.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/11008" target="_blank">Issue #11008</a>:
+    ensure that a JavaScript variable that retrieves the index of an item in a layout is called correctly.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/13115" target="_blank">Issue #13115</a>:
+    Fix a bug where a widget removed from a disabled parent widget and added to a different enabled parent widget would still appear disabled.
+  </li>
+  <li>
+    <a href="https://redmine.webtoolkit.eu/issues/12174" target="_blank">Issue #12174</a>:
+    an automated test for Selenium has been added for the widget gallery. This will ensure that for all used widgets, a base case is tested, and JS errors are less likely to be merged.
+    This is an internal tool, but added to the public repository, as an example. This is likely something many developers would find useful.
+  </li>
+</ul>
+
+<h2>Release 4.11.0 (October 1, 2024)</h2>
+
+<p>
+  Wt 4.11.0 is a major release. That focuses on authentication and WebSockets.
+</p>
+
+<p>
+  First Wt is now able to support MFA in its authentication system. It is easily enabled with a single call to <a href="classWt_1_1Auth_1_1AuthService.html#aad075b232ddafe52a4953f3c341e6e75" target="_blank">AuthService::setMfaProvider()</a>. By default an implementation for TOTP is included. This offers a way to enable an additional layer of security for your applications. Instead of remembering a single password, users can be made to enter a short code that changes often, as an additional authentication step.
+  Developers are also able to implement this feature in any way they see fit via the interface <a href="classWt_1_1Auth_1_1Mfa_1_1AbstractMfaProcess.html" target="_blank">AbstractMfaProcess</a>. A couple examples are provided in the source code, and the <a href="../../tutorial/auth.html" target="_blank">authentication tutorial</a>.
+</p>
+<p>
+  If you like using WebSockets, there is good news! Wt was already able to communicate with its server over WebSockets. This was, however, limited to only its communication for updates regarding its framework. Now you are able to use them in whatever custom way you see fit. Developers can set up endpoints (both session-private or public) that listen to incoming requests. The browser (or another client) can then use those endpoints to connect to said resource. A connection has now been established, and messages can be send back and forth.
+</p>
+
+<h3>New features</h3>
+
+<ul>
+  <li>
+    <a href="https://redmine.webtoolkit.eu/issues/11705">Issue #11705</a>:
+    MFA (Multi-Factor Authentication) is now supported by means of a default implementation of TOTP (Time-Based One-Time Password). This feature can be enabled by <a href="classWt_1_1Auth_1_1AuthService.html#aad075b232ddafe52a4953f3c341e6e75" target="_blank">AuthService::setMfaProvider()</a>, and the length of the expected code can be managed via <a href="classWt_1_1Auth_1_1AuthService.html#a8a1821d0e0824a648aee4c509a2bc7d1" target="_blank">AuthService::setMFACodeLength()</a>.
+    Once enabled, users are allowed (but not forced) to use MFA. A developer will have to create a way that allows users to set their secret key, or override the functionality that decides whether the MFA step ought to be shown to the user during the login process (<a href="classWt_1_1Auth_1_1AuthModel.html#af2083a59fc1458c1fb0020bec0cdf959" target="_blank">AuthModel::hasMfaStep()</a>). Alternatively, they can also set <a href="classWt_1_1Auth_1_1AuthService.html#a5c708962311456a67c07e25c03247b23" target="_blank">AuthService::setMFARequired()</a> to <code>true</code>, which will force all users to have MFA enabled.
+    If enabled and required, a user will see the <a href="classWt_1_1Auth_1_1Mfa_1_1TotpProcess.html" target="_blank">TotpProcess</a> when they pass the regular login. This will happen after password login. Developers can use this process to enable MFA on a per-user manner, without globally enforcing it.
+    This widget shows them a QR code and a secret key initially for them to store in an authenticator app or browser extension. Once stored, it will no longer show them this code or key, unless invalidated (by means of <a href="classWt_1_1Auth_1_1User.html#ac65b7e7277df1d8cd4805e0b4d13b29d" target="_blank">User::removeIdentity()</a>, which will take the same name as the <code>setMfaProvider()</code>).
+
+    <p>The above approach will be the default flow that Wt uses if MFA is enabled (and/or required). Developers are able to provide a custom implementation as well, using the <a href="classWt_1_1Auth_1_1Mfa_1_1AbstractMfaProcess.html" target="_blank">AbstractMfaProcess</a> class. It is encouraged to look at the examples under <code>examples/authentication/mfa</code> in the source code, to have a concrete idea on how to use the class correctly.</p>
+  </li>
+  <li>
+    <a href="https://redmine.webtoolkit.eu/issues/12461" target="_blank">Issue #12461</a>:
+    Developers are now able to connect to a public or private resource using the <a href="https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API" target="_blank">WebSocket protocol</a>. While WebSockets were already integrated into Wt, they were only used to stream updates between the server and the client as an alternative to long-polling.
+    Now they can actually be used by developers for custom purposes. The <a href="classWt_1_1WWebSocketResource.html" target="_blank">WWebSocketResource</a> is used to create a new endpoint. This can be global (static), when linked to the WServer itself, or session-private (dynamic) when exposed in the WApplication.
+    When a connection from the client side is established, a <a href="classWt_1_1WWebSocketConnection.html" target="_blank">WWebSocketConnection</a> is created. This serves as a way to track a singular connection between the server and a client.
+  </li>
+</ul>
+
+<h3>Other improvements</h3>
+
+<ul>
+  <li>
+    <a href="https://redmine.webtoolkit.eu/issues/10382" target="_blank">Issue #10382</a>:
+    Added customization support for the upload mechanism of
+    <a href="classWt_1_1WFileDropWidget.html">WFileDropWidget</a>.
+    It is now possible to customize the server-side upload mechanism by returning a custom WResource from
+    <a href="classWt_1_1WFileDropWidget.html#a149fa0f12016c615c1763046dc2f7333">WFileDropWidget::uploadResource()</a>
+    to be uploaded to.
+    At the client side, uploading can be modified by setting <code>wtUseCustomSend</code> and defining <code>wtCustomSend()</code>.
+  </li>
+  <li>
+    <a href="https://redmine.webtoolkit.eu/issues/12320" target="_blank">Issue #12320</a>:
+    allows for the "Cache-Control" header to be specified for the <a href="classWt_1_1WServer.html">WServer</a>. This is to be passed as a command-line option when running the <code>WServer</code>.
+  </li>
+  <li>
+    <a href="https://redmine.webtoolkit.eu/issues/11600" target="_blank">Issue #11600</a>:
+    added unit tests for <a href="classWt_1_1Form_1_1WAbstractFormDelegate.html">WFormDelegate</a> classes.
+  </li>
+</ul>
+
+<h3>Bug fixes</h3>
+
+<ul>
+  <li>
+    <a href="https://redmine.emweb.be/issues/12367" target="_blank">Issue #12367</a>:
+    Fix a bug where the checkbox in a
+    <a href="classWt_1_1WPopupMenu.html" target="_blank">WPopupMenu</a> would not be checked if a
+    <a href="classWt_1_1WMenuItem.html" target="_blank">WMenuItem</a> was clicked, and not the
+    <a href="classWt_1_1WCheckBox.html" target="_blank">WCheckBox</a> or its label. Also fixes a bug where the signal of a <code>WMenuItem</code> checkbox would not be emitted after switching between the item being checkable or not.
+  </li>
+  <li>
+    <a href="https://redmine.webtoolkit.eu/issues/12676" target="_blank">Issue #12676</a>:
+    although technically an improvement, since it was left for so long, it became a bug with Boost 1.85.0.
+    The version retired the <a href="https://live.boost.org/doc/libs/1_84_0/boost/filesystem/convenience.hpp" target="_blank">boost/filesystem/convenience.hpp</a> header. And also removed some <a href="https://www.boost.org/doc/libs/1_84_0/libs/filesystem/doc/reference.html#path-deprecated-functions" target="_blank">deprecated functions</a>.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/12737" target="_blank">Issue #12737</a>:
+    cancel every action on a socket before closing it to avoid reading on a closed socket.
+  </li>
+  <li>
+    <a href="https://redmine.webtoolkit.eu/issues/12323" target="_blank">Issue #12323</a>:
+    does no longer cause an issue when a <a href="classWt_1_1WMenu.html#a92e4b0124610afda2f48a126ebed3b66" target="_blank">WMenu::addSeparator()</a> was added, together with using <a href="classWt_1_1WBootstrap5Theme.html" target="_blank">WBootstrap5Theme</a>.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/12366" target="_blank">Issue #12366</a>:
+    Fixed a bug where some
+    <a href="classWt_1_1WContainerWidget.html" target="_blank">WContainerWidget</a> would send undefined information when TwoPhaseRenderingThreshold was not set to 0.
+  </li>
+  <li>
+    <a href="https://redmine.webtoolkit.eu/issues/12538" target="_blank">Issue #12538</a>:
+    correctly implement the <a href="https://datatracker.ietf.org/doc/html/rfc5322#section-3.6.3" target="_blank">RFC5322 specification</a> for mail messages. The "To:" and "Cc:" fields are now correctly placed on a single line. With multiple addresses this results in a comma-separated list of addresses.
+  </li>
+  <li>
+    <a href="https://redmine.webtoolkit.eu/issues/9284">Issue #9284</a>:
+    a <a href="classWt_1_1WTableView.html" target="_blank">WTableView</a> will now render more correctly in layouts. A combination of various layouts could lead to the table not setting its size correctly, or even not having a consistent size (apparently randomly deciding
+    to fill in all available space, or to shrink to fit its content). This led to the issue where scrollbars were sometimes not visible, or were placed in a wrong location. By default, a table will now size correctly, and place the scrollbars accordingly, namely at the edges of its container.
+  </li>
+  <li>
+    <a href="https://redmine.webtoolkit.eu/issues/11954" target="_blank">Issue #11954</a>:
+    resolve a fairly big memory leak when using Pango. Pango is a library that is by default enabled (controlled using the <code>ENABLE_PANGO</code> build flag). This library is used to generate PDFs with the <a href="classWt_1_1Render_1_1WPdfRenderer.html">WPdfRenderer</a>.
+    The font map that Pango generated to track available fonts was never correctly released. Some other Pango specific objects (resulting from calls to the library), such as the context and fonts were also not always released. These objects are now managed by smart pointers to ensure proper memory management.
+    A single leak does remain, which seemingly comes from Pango or libfontconfig itself (see: <a href="https://redmine.webtoolkit.eu/issues/12844" target="_blank">Issue #12844</a>).
+  </li>
+</ul>
+
 <h2>Release 4.10.4 (March 6, 2024)</h2>
 
 <p>
@@ -91,6 +803,10 @@ behaviour.
   <li>
     <a href="https://redmine.webtoolkit.eu/issues/11960">Issue #11960</a>:
     remove an <a href="https://ibpp.sourceforge.io/">IBPP</a> deprecation warning.
+  </li>
+  <li>
+    <a href="https://redmine.webtoolkit.eu/issues/11772">Issue #11772</a>:
+    some warnings in the code were fixed, so that the build process will produce less output, resulting in a cleaner build step.
   </li>
 </ul>
 
@@ -2902,7 +3618,7 @@ was undesirable, like the <a href="group__dbo.html#ga1d0ec6819b1bf5b7a88ad030b91
     <p>Additionally, we've made the <code>Wt::Json</code> API a bit more friendly, by adding support
     for initializer lists (when using C++11), and implicit constructors for
     <a href="classWt_1_1Json_1_1Value.html">Wt::Json::Value</a>
-    from 
+    from
     <a href="classWt_1_1Json_1_1Object.html">Wt::Json::Object</a> and
     <a href="classWt_1_1Json_1_1Array.html">Wt::Json::Array</a>.</p>
   </dd>
@@ -3025,7 +3741,7 @@ was undesirable, like the <a href="group__dbo.html#ga1d0ec6819b1bf5b7a88ad030b91
 	method was added to WPainter.
       </li>
       <li>
-	Previously, WDialogs were movable by default. It's now possible to disable this with 
+	Previously, WDialogs were movable by default. It's now possible to disable this with
 	<a href="classWt_1_1WDialog.html#afbccf557a0343591f3087c9a0a9b7051">WDialog::setMovable()</a>.
       </li>
     </ul>
@@ -3177,7 +3893,7 @@ was undesirable, like the <a href="group__dbo.html#ga1d0ec6819b1bf5b7a88ad030b91
 
 	This is only available if the chart is drawn
 	on an HTML canvas. This is the default rendering method on modern browsers.
-	
+
 	When enabled, the crosshair will follow mouse movement,
 	and show in the top right corner the coordinate
 	(according to X axis and the first Y axis)  corresponding to this position.
@@ -3293,7 +4009,7 @@ was undesirable, like the <a href="group__dbo.html#ga1d0ec6819b1bf5b7a88ad030b91
     proper polymorphic class, and you can provide your own
     implementation. In this way you can customize things like for
     example label strings.
-  </dd>  
+  </dd>
 
   <dt>
     Several new features in the 3D charts library.
@@ -3682,7 +4398,7 @@ was undesirable, like the <a href="group__dbo.html#ga1d0ec6819b1bf5b7a88ad030b91
     i.e. in <a href="classWt_1_1WIntValidator.html">WIntValidator</a> and
     <a href="classWt_1_1WDoubleValidato.htmlr">WDoubleValidator</a>.
   </dd>
-  
+
   <dt>
     <a href="classWt_1_1WNavigationBar.html">WNavigationBar</a>
   </dt>
@@ -3723,7 +4439,7 @@ was undesirable, like the <a href="group__dbo.html#ga1d0ec6819b1bf5b7a88ad030b91
     from Paul Harrisson who maintained this backend so far outside the
     Wt distribution. The backend has been designed for MariaDB, but
     should work fine for MySQL as well.
-  </dd>  
+  </dd>
 </dl>
 
 <h3>B) Main improvements:</h3>
@@ -3760,7 +4476,7 @@ was undesirable, like the <a href="group__dbo.html#ga1d0ec6819b1bf5b7a88ad030b91
   </dt>
   <dd>
     Addition of a validator() function that returns the validator for
-    a field set using setValidator(), 
+    a field set using setValidator(),
   </dd>
 
   <dt>
@@ -3770,7 +4486,7 @@ was undesirable, like the <a href="group__dbo.html#ga1d0ec6819b1bf5b7a88ad030b91
     Support for binary transfers which avoids serialization and
     deserialization of floats to text.
   </dd>
-  
+
   <dt>
     <a href="classWt_1_1WPushButton.html">WPushButton</a>
   </dt>
@@ -3825,7 +4541,7 @@ was undesirable, like the <a href="group__dbo.html#ga1d0ec6819b1bf5b7a88ad030b91
     updateModelValue() which only update the value but not other
     aspects such as visibility, validation state, or messages.
   </dd>
-  
+
   <dt>
     Built-in httpd improvements
   </dt>
@@ -3883,7 +4599,7 @@ was undesirable, like the <a href="group__dbo.html#ga1d0ec6819b1bf5b7a88ad030b91
     noticeable API changes, except for the changes in markup and CSS
     documented above.
   </dd>
-  
+
   <dt>
     <a href="classWt_1_1WTreeNode.html">WTreeNode</a>,
     <a href="classWt_1_1WTreeTable.html">WTreeTable</a>
@@ -4436,7 +5152,7 @@ was undesirable, like the <a href="group__dbo.html#ga1d0ec6819b1bf5b7a88ad030b91
   </dd>
 
   <dt>
-    <a href="classWt_1_1Http_1_1Client.html">Http::Client</a>, 
+    <a href="classWt_1_1Http_1_1Client.html">Http::Client</a>,
     <a href="classWt_1_1Http_1_1Message.html">Http::Message</a>
   </dt>
   <dd>
@@ -4835,14 +5551,14 @@ deprecated:
   <li>
     WHTMLAudio is now WAudio
   </li>
-</ul>    
+</ul>
 
 <hr>
 
 <h2>Release 3.1.10 (July 8, 2011)</h2>
 
 <p>
-  This release contains a mix of new features and bug fixes 
+  This release contains a mix of new features and bug fixes
 </p>
 
 <h3>A) New classes:</h3>
@@ -5089,7 +5805,7 @@ deprecated:
   </dt>
   <dd>
     Several quality improvements: correct rendering of alpha
-    compositing, text rendering by libpango, 
+    compositing, text rendering by libpango,
   </dd>
 
   <dt>
@@ -5197,7 +5913,7 @@ applications on these devices.</p>
     A font metrics class. Font metrics are only available for
     WPdfImage, and an implementation is planned for WRasterImage.
   </dd>
-  <dt><a href="classWt_1_1Render_1_1WTextRenderer.html">Render::WTextRenderer</a>, 
+  <dt><a href="classWt_1_1Render_1_1WTextRenderer.html">Render::WTextRenderer</a>,
   <a href="classWt_1_1Render_1_1WPdfRenderer.html">Render::WPdfRenderer</a></dt>
   <dd>
     A renderer class for a subset of XHTML, useful for e.g.~generating
@@ -5426,7 +6142,7 @@ applications on these devices.</p>
     <ul>
       <li>Provide a workaround for broken g++ compiler shipped in Ubuntu
       Maverick</li>
-      <li>Provide support for building without using 
+      <li>Provide support for building without using
       std::wstring (-DWT_NO_STD_WSTRING) or std::locale
       (-DWT_NO_STD_LOCALE=OFF) support.
       </li>
@@ -6010,7 +6726,7 @@ to upgrade live deployments of his application to the latest version.
     no-ops</dd>
   <dt><a href="classWt_1_1WWidget.html">WWidget</a></dt>
   <dd>Added positionAt() method which positions a widget (absolutely) besides
-    another widget.</dd>  
+    another widget.</dd>
   <dt><a href="classWt_1_1Chart_1_1WAxis.html">Chart/WAxis></a></dt>
   <dd>Added a setLabelFont() method.</dd>
   <dt><a href="classWt_1_1Http_1_1Request.html">Http/Request</a></dt>
@@ -7092,13 +7808,13 @@ Wt::WApplication *createApplication(const Wt::WEnvironment&amp; env)
 <h4>5) Configuration in /etc/wt/wt_config.xml</h4>
 
 <p>
-  Wt 2.0.0 uses a configuration file for a number of settings that 
+  Wt 2.0.0 uses a configuration file for a number of settings that
   could previously be configured at build time of the library, or
   in the API. The latter functions are:
 </p>
 <ul>
   <li><samp>WApplication::setMaximumRquestSize()</samp></li>
-  <li><samp>WApplication::setIdleTimeout()</samp></li>  
+  <li><samp>WApplication::setIdleTimeout()</samp></li>
 </ul>
 
 <h4>6) Removed obsolete classes</h4>

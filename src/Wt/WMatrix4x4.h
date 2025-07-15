@@ -74,6 +74,9 @@ public:
     impl() = m;
   }
 
+  //! Copy assignment operator
+  WMatrix4x4& operator=(const WMatrix4x4& other);
+
   /*! \brief Construct for a WGenericMatrix
    *
    * Creates the identity transformation matrix. As we inherit from
@@ -98,6 +101,9 @@ public:
              double m21, double m22, double m23, double m24,
              double m31, double m32, double m33, double m34,
              double m41, double m42, double m43, double m44);
+
+  //! Destructor
+  ~WMatrix4x4() = default;
 
   /*! \brief Returns the determinant.
    */

@@ -188,10 +188,10 @@ Trying the examples (or your own Wt application)
    the build option EXAMPLES_CONNECTOR (see supra).
 
    Some examples need TinyMCE:
-     * Download TinyMCE from [17]http://tinymce.moxiecode.com/ and install
-       its tiny_mce folder into the resources/ folder.
+     * Download TinyMCE from [17]https://www.tiny.cloud/ and install
+       its tinymce (tiny_mce for version 3) folder into the resources/ folder.
 
-   You will notice 404 File not Found errors for resources/tiny_mce/ if
+   You will notice 404 File not Found errors for resources/tiny(_)mce/ if
    you are missing this library.
 
   A. Using wthttpd
@@ -224,7 +224,7 @@ Trying the examples (or your own Wt application)
 General options:
   -h [ --help ]                         produce help message
   -t [ --threads ] arg (=-1)            number of threads (-1 indicates that
-                                        num_threads from wt_config.xml is to be
+                                        num-threads from wt_config.xml is to be
                                         used, which defaults to 10)
   --servername arg                      servername (IP address or DNS name)
   --docroot arg                         document root for static files,
@@ -251,7 +251,8 @@ General options:
                                         used, or else the current working
                                         directory
   --errroot arg                         root for error pages
-  --accesslog arg                       access log file (defaults to stdout),
+  --accesslog arg                       access log file, if not specified,
+                                        access logs are logged like other logs,
                                         to disable access logging completely,
                                         use --accesslog=-
   --no-compression                      do not use compression
@@ -420,5 +421,5 @@ References
   14. http://www.unixodbc.org/
   15. http://www.nongnu.org/libunwind/
   16. http://www.fastcgi.com/
-  17. http://tinymce.moxiecode.com/
+  17. https://www.tiny.cloud/
   18. http://127.0.0.1:8080/

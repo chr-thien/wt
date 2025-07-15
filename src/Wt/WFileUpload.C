@@ -27,7 +27,7 @@
 
 namespace Wt {
 
-LOGGER("WFileUpload");
+WT_MAYBE_UNUSED LOGGER("WFileUpload");
 
 class WFileUploadResource final : public WResource {
 public:
@@ -65,9 +65,14 @@ protected:
 #endif // WT_TARGET_JAVA
 
     o << "<!DOCTYPE html>"
-      "<html>\n"
-      "<head><script type=\"text/javascript\">\n"
-      "function load() { ";
+      << "<html>\n"
+      << "<head><script"
+      << " type=\"text/javascript\"";
+    if (!response.nonce().empty()) {
+      o << " nonce=\""<<response.nonce()<<"\"";
+    }
+    o << ">\n"
+      << "function load() { ";
 
     if (triggerUpdate || request.tooLarge()) {
       UserAgent agent =
@@ -115,9 +120,9 @@ protected:
       LOG_DEBUG("Resource handleRequest(): no signal");
     }
 
-    o << "}\n"
+    o << "}window.onload=function() { load(); };\n"
       "</script></head>"
-      "<body onload=\"load();\"></body></html>";
+      "<body></body></html>";
 
     if (!request.tooLarge() && !files.empty())
       fileUpload_->setFiles(files);

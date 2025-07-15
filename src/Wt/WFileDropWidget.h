@@ -13,20 +13,44 @@
 namespace Wt {
 
 class WMemoryResource;
+namespace Json {
+  class Object;
+}
+
+/*! \brief Enumeration of file picker types
+ *
+ * The browser can open the file picker in two modes: one where only files
+ * can be selected and another where only directories can be selected.
+ */
+enum class FilePickerType {
+  None,              //!< No file picker.
+  FileSelection,     //!< Only files can be selected.
+  DirectorySelection //!< Only directories can be selected.
+};
 
 /*! \class WFileDropWidget Wt/WFileDropWidget.h Wt/WFileDropWidget.h
- *  \brief A widget that allows dropping files for upload.
+ *  \brief A widget that allows dropping files and directories for upload.
  *
  * This widget accepts files that are dropped into it. A signal is triggered
- * whenever one or more files are dropped. The filename, type and size of
- * these files is immediately available through the WFileDropWidget::File
- * interface.
+ * whenever one or more files or directories are dropped. The filename, type
+ * and size of files is immediately available through the WFileDropWidget::File
+ * interface. Similarly, information about directories is available through
+ * the WFileDropWidget::Directory interface (which is a subclass of File).
  *
  * The file upload is done sequentially. All files before the currentIndex()
  * have either finished, failed or have been cancelled.
  *
  * The widget has the default style-class 'Wt-filedropzone'. The style-class
  * 'Wt-dropzone-hover' is added when files are hovered over the widget.
+ *
+ * Apart from dropping files, users can also use the browser-specific dialog
+ * to select files or directories. Note that the dialog will support either
+ * selecting files or directories, but not both at the same time.
+ * The dialog can be opened by clicking the widget. The type of dialog that is
+ * opened can be configured with setOnClickFilePicker(FilePickerType). The
+ * dialog can also be opened programmatically in response to another event
+ * (e.g. a user clicking a button outside this widget) using openFilePicker()
+ * and openDirectoryPicker().
  */
 class WT_API WFileDropWidget : public WContainerWidget {
 public:
@@ -42,6 +66,17 @@ public:
     /*! \brief Returns the client filename.
      */
     const std::string& clientFileName() const { return clientFileName_; }
+
+    /*! \brief Returns the path of the file.
+     *
+     * This is only relevant if the user dropped a folder. The path will be
+     * relative to the folder that was dropped.
+     */
+    const std::string& path() const { return path_; }
+
+    /*! \brief Returns whether this is a directory.
+     */
+    virtual bool directory() const { return false; }
 
     /*! \brief Returns the mime-type of the file.
      */
@@ -66,7 +101,7 @@ public:
      *
      * \sa uploadedFile()
      */
-    bool uploadFinished() const { return uploadFinished_; }
+    bool uploadFinished() const;
 
     /*! \brief This signal allows you to track the upload progress of the file.
      *
@@ -88,7 +123,8 @@ public:
     bool isFiltered() const { return isFiltered_; }
 
     // Wt internal
-    File(int id, const std::string& fileName, const std::string& type, ::uint64_t size, ::uint64_t chunkSize);
+    File(int id, const std::string& fileName, const std::string& path, const std::string& type,
+         ::uint64_t size, ::uint64_t chunkSize);
     int uploadId() const { return id_; }
     void handleIncomingData(const Http::UploadedFile& file, bool last);
     void cancel();
@@ -100,6 +136,7 @@ public:
   private:
     int id_;
     std::string clientFileName_;
+    std::string path_;
     std::string type_;
     ::uint64_t size_;
     Http::UploadedFile uploadedFile_;
@@ -115,6 +152,31 @@ public:
     ::uint64_t chunkSize_;
   };
 
+  /*! \class Directory
+   *  \brief A nested class of WFileDropWidget representing a Directory.
+   *
+   * In true linux tradition, a Directory is a File. However, in this case it
+   * was more a matter of compatibility. This class was added later on and by
+   * having it inherit from File, the existing WFileDropWidget::drop() signal
+   * can return both Files and Directories.
+   */
+  class WT_API Directory : public File {
+  public:
+    /*! \brief Returns the contents of the directory.
+     */
+    const std::vector<File*>& contents() const { return contents_; }
+
+    /*! \brief Returns whether this is a directory.
+     */
+    bool directory() const override { return true; }
+
+    // Wt internal
+    Directory(const std::string& fileName, const std::string& path);
+    void addFile(File *file);
+
+  private:
+    std::vector<File*> contents_;
+  };
 
   /*! \brief Constructor
    */
@@ -160,9 +222,32 @@ public:
    *
    * This can be used to free resources of files that were already uploaded. A
    * file can only be removed if its index in uploads() is before the current
-   * index.
+   * index. A directory can be removed as soon as the drop() signal is emitted.
+   *
+   * \note This method is only important if you intend to use this widget to
+   * upload a lot of files. Otherwise, simply removing the widget will also clean
+   * up all resources.
+   *
+   * \sa removeDirectories()
    */
   bool remove(File *file);
+
+  /*! \brief Cleans up resources of WFileDropWidget::Directory objects
+   *
+   * This can be used to free resources. The drop() signal returns raw pointers
+   * for objects that are managed by this widget. The Directory objects are no
+   * longer needed after the drop() signal, so whenever you don't need them
+   * anymore, it is safe to call this method. Note that no WFileDropWidget::File
+   * objects are removed by this method since these objects can only be removed
+   * after their upload has completed.
+   *
+   * \note This method is only important if you intend to use this widget to
+   * upload a lot of files. Otherwise, simply removing the widget will also clean
+   * up all resources.
+   *
+   * \sa remove(File*)
+   */
+  void cleanDirectoryResources();
 
   /*! \brief When set to false, the widget no longer accepts any files.
    */
@@ -173,6 +258,7 @@ public:
    *
    * \deprecated Override the css rule '.Wt-filedropzone.Wt-dropzone-hover' instead.
    */
+  WT_DEPRECATED("Override the CSS rule '.Wt-filedropzone.Wt-dropzone-hover' instead.")
   void setHoverStyleClass(const std::string& className);
 
   /*! \brief Sets input accept attributes
@@ -223,6 +309,78 @@ public:
    */
   void setJavaScriptFilter(const std::string& filterFn, ::uint64_t chunksize = 0, const std::vector<std::string>& imports = std::vector<std::string>());
 
+  /*! \brief Allow users to drop directories.
+   *
+   * Dropping a directory will emit the drop() signal with a Directory object (which
+   * inherits File). A directory can also be recognized by the File::directory()
+   * method. After downcasting the object, the method Directory::contents() can be
+   * used to iterate over the contents.
+   *
+   * Subdirectories are also included in the contents. The contents of subdirectories
+   * itself is only included if recursive is true.
+   *
+   * Only File objects for which File::directory() is false are uploaded to the
+   * server. The contents of a directory is 'flattened' into the uploads() vector.
+   * The directory structure is still available through the File::path() method
+   * that describes the file's path relative to the dropped directory.
+   *
+   * \sa openFilePicker(), openDirectoryPicker()
+   */
+  void setAcceptDirectories(bool enable, bool recursive = false);
+
+  /*! \brief Returns if directories are accepted.
+   *
+   * Dropping a directory will upload all of its contents. This can be done either
+   * non-recursively (default) or recursively. The directory structure is available
+   * during the initial drop() signal or through the File::path() method.
+   */
+  bool acceptDirectories() const { return acceptDirectories_; }
+
+  /*! \brief Returns if directory contents is uploaded recursively or not.
+   */
+  bool acceptDirectoriesRecursive() const { return acceptDirectoriesRecursive_; }
+
+  /*! \brief Set the type of file picker that is opened when a user clicks the widget.
+   *
+   * The default is FilePickerType::FileSelection.
+   *
+   * When FilePickerType::None is passed, no file picker will be shown. Files or
+   * directories can still be dropped in, if setAcceptDrops() is set to \p true (which
+   * by default it is). Also note that in this case, the methods openFilePicker() and
+   * openDirectoryPicker() can still be used to open a picker by redirecting clicks
+   * from other buttons.
+   */
+  void setOnClickFilePicker(FilePickerType type);
+
+  /*! \brief Returns the type of file picker that is opened when a user clicks the widget.
+   */
+  FilePickerType onClickFilePicker() const { return onClickFilePicker_; }
+
+  /*! \brief Programmatically open the file picker.
+   *
+   * Users can click the widget to open a browser-specific dialog to select either files
+   * or directories (see setOnClickFilePicker(FilePickerType)). This method allows
+   * developers to also open the dialog by other means, e.g. buttons outside the widget
+   * to open either the file- or directory picker.
+   *
+   * \sa openDirectoryPicker()
+   */
+  void openFilePicker();
+
+  /*! \brief Programmatically open the directory picker.
+   *
+   * Users can click the widget to open a browser-specific dialog to select either files
+   * or directories (see setOnClickFilePicker(FilePickerType)). This method allows
+   * developers to also open the dialog by other means, e.g. buttons outside the widget
+   * to open either the file- or directory picker.
+   *
+   * \warning Due to limitations in the directory picker api, empty directories will not be
+   * returned when selected through the dialog.
+   *
+   * \sa openFilePicker()
+   */
+  void openDirectoryPicker();
+
   /*! \brief The signal triggers if one or more files are dropped.
    */
   Signal<std::vector<File*> >& drop() { return dropEvent_; }
@@ -254,10 +412,51 @@ public:
    */
   Signal<File*>& uploadFailed() { return uploadFailed_; }
 
+  /*! \brief Indicate that the next file can be handled
+   *
+   * Internally indicate handling of the next file. Any resource handling the
+   * upload needs to call this when the file is handled.
+   */
+  void proceedToNextFile();
+
 protected:
   virtual std::string renderRemoveJs(bool recursive) override;
   virtual void enableAjax() override;
   virtual void updateDom(DomElement& element, bool all) override;
+  class WFileDropUploadResource;
+
+  /*! \brief Resource to upload data to
+   *
+   * This returns a resource to upload data to.
+   * By default this returns a resource where the file contents can be POSTed.
+   * This can be overridden to allow for custom upload mechanisms.
+   *
+   * This can be used to implement upload protocols that are different from the
+   * normal upload flow. The request may include extra information in their
+   * payload, or be located on a public fixed URL and require custom handling
+   * of the request.
+   *
+   * On the client side, the JS function wtCustomSend(isValid, url, upload, APP)
+   * can implement a custom upload mechanism, with:
+   * - isValid: whether a valid file is uploaded
+   * - url: the upload location
+   * - upload: a file object with:
+   *   - id: generated upload identifier
+   *   - filename: upload file name
+   *   - type: file type
+   *   - size: file size
+   * 
+   * To use this function, define the JS boolean \c wtUseCustomSend, which is
+   * \c false by default. Example:
+   * \code
+   * Wt::WApplication::instance().setJavaScriptMember("wtUseCustomSend", "true");
+   * Wt::WApplication::instance().setJavaScriptMember("wtCustomSend",
+   *   "function(isValid, url, upload) { * ... * };");
+   * \endcode
+   */
+  virtual std::unique_ptr<WResource> uploadResource();
+  virtual JSignal<int>& requestSend() { return requestSend_; };
+  virtual File* currentFile() { return uploads_[currentFileIdx_].get(); };
 
 private:
   void setup();
@@ -270,14 +469,13 @@ private:
   void onDataExceeded(::uint64_t dataExceeded);
   void createWorkerResource();
   void disableJavaScriptFilter();
+  File* addDropObject(const Wt::Json::Object& object);
 
   // Functions for handling incoming requests
-  void proceedToNextFile();
   bool incomingIdCheck(int id);
 
   WMemoryResource *uploadWorkerResource_;
-  class WFileDropUploadResource;
-  std::unique_ptr<WFileDropUploadResource> resource_;
+  std::unique_ptr<WResource> resource_;
   unsigned currentFileIdx_;
 
   static const std::string WORKER_JS;
@@ -291,6 +489,11 @@ private:
   std::string acceptAttributes_;
   bool dropIndicationEnabled_;
   bool globalDropEnabled_;
+
+  bool acceptDirectories_;
+  bool acceptDirectoriesRecursive_;
+
+  FilePickerType onClickFilePicker_ = FilePickerType::FileSelection;
 
   JSignal<std::string> dropSignal_;
   JSignal<int> requestSend_;
@@ -306,16 +509,17 @@ private:
   Signal<File*> uploadFailed_;
 
   std::vector<std::unique_ptr<File> > uploads_;
+  std::vector<std::unique_ptr<File> > directories_;
 
-  static const int BIT_HOVERSTYLE_CHANGED  = 0;
-  static const int BIT_ACCEPTDROPS_CHANGED = 1;
-  static const int BIT_FILTERS_CHANGED     = 2;
-  static const int BIT_DRAGOPTIONS_CHANGED = 3;
-  static const int BIT_JSFILTER_CHANGED    = 4;
-  std::bitset<5> updateFlags_;
+  static const int BIT_HOVERSTYLE_CHANGED        = 0;
+  static const int BIT_ACCEPTDROPS_CHANGED       = 1;
+  static const int BIT_FILTERS_CHANGED           = 2;
+  static const int BIT_DRAGOPTIONS_CHANGED       = 3;
+  static const int BIT_JSFILTER_CHANGED          = 4;
+  static const int BIT_ONCLICKFILEPICKER_CHANGED = 5;
+  std::bitset<6> updateFlags_;
   bool updatesEnabled_; // track if this widget enabled updates.
 
-  friend class WFileDropUploadResource;
 };
 
 }

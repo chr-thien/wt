@@ -18,7 +18,7 @@
 
 #ifdef JSON_PARSER
 
-#include "3rdparty/rapidxml/rapidxml.hpp"
+#include "thirdparty/rapidxml/rapidxml.hpp"
 
 #include <boost/spirit/include/qi.hpp>
 #include <boost/phoenix/core.hpp>
@@ -73,8 +73,6 @@ struct json_grammar : public qi::grammar<Iterator, ascii::space_type>
     state_.push_back(State::InObject);
     currentValue_ = &result_;
   }
-
-  typedef boost::iterator_range<std::string::const_iterator> StrValue;
 
   void startObject(bool &pass)
   {
@@ -135,7 +133,7 @@ struct json_grammar : public qi::grammar<Iterator, ascii::space_type>
       >> lit('}')[endObject]
       ;
 
-    const auto setMemberName = [this](const StrValue &value)
+    const auto setMemberName = [this]()
     {
       assert(state() == State::InObject);
 
@@ -163,7 +161,7 @@ struct json_grammar : public qi::grammar<Iterator, ascii::space_type>
       >> lit(']')[endArray]
       ;
 
-    const auto setStringValue = [this](const StrValue &value)
+    const auto setStringValue = [this]()
     {
       refCurrent();
 

@@ -4,9 +4,8 @@
  * See the LICENSE file for terms of use.
  */
 
-#include <iostream>
-#include <stdlib.h>
-#include <algorithm>
+#include "ExampleSourceViewer.h"
+#include "FileItem.h"
 
 #include <Wt/WApplication.h>
 #include <Wt/WContainerWidget.h>
@@ -21,24 +20,18 @@
 #include <Wt/WVBoxLayout.h>
 #include <Wt/WViewWidget.h>
 
-#include <boost/filesystem/operations.hpp>
-#include <boost/filesystem/exception.hpp>
-#include <boost/filesystem/convenience.hpp>
-#include <boost/algorithm/string.hpp>
+#include <Wt/cpp17/filesystem.hpp>
 
-#include "ExampleSourceViewer.h"
-#include "FileItem.h"
+#include <iostream>
+#include <stdlib.h>
+#include <algorithm>
 
-namespace fs = boost::filesystem;
+namespace fs = cpp17::filesystem;
 
 // Same as p.filename() in latest boost::filesystem
 static std::string filename(const fs::path& p)
 {
-#if BOOST_FILESYSTEM_VERSION < 3
-  return p.empty() ? std::string() : *--p.end();
-#else
   return p.empty() ? std::string() : (*--p.end()).string();
-#endif
 }
 
 // Same as p.stem() in latest boost::filesystem
@@ -184,7 +177,7 @@ void ExampleSourceViewer::setExample(const std::string& exampleDir,
  */
 static fs::path getCompanion(const fs::path& path)
 {
-  std::string ext = fs::extension(path);
+  std::string ext = path.extension().string();
 
   if (ext == ".h")
     return parent_path(path) / (stem(path) + ".C");
@@ -226,8 +219,8 @@ void ExampleSourceViewer::cppTraverseDir(WStandardItem* parent,
         continue;
 
       // skip files with an extension we do not want to handle
-      if (fs::is_regular(p)) {
-        std::string ext = fs::extension(p);
+      if (fs::is_regular_file(p)) {
+        std::string ext = p.extension().string();
         bool supported = false;
         for (const char **s = supportedFiles; *s != 0; ++s)
           if (*s == ext) {
@@ -305,7 +298,7 @@ void ExampleSourceViewer::javaTraversePackages(WStandardItem *parent,
   FileItem *packageItem = nullptr;
   for (fs::directory_iterator i(srcPath); i != end_itr; ++i) {
     fs::path p = *i;
-    if (fs::is_regular(p)) {
+    if (fs::is_regular_file(p)) {
       if (!packageItem) {
         auto item = std::make_unique<FileItem>("/icons/package.png", packageName, "");
         packageItem = item.get();

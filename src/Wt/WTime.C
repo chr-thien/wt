@@ -33,6 +33,17 @@ WTime::WTime(int h, int m, int s, int ms)
   setHMS(h, m, s, ms);
 }
 
+#ifdef WT_DATE_TZ_USE_STD
+WTime::WTime(const std::chrono::hh_mm_ss<std::chrono::duration<int, std::milli>>& time)
+  : valid_(false),
+    null_(false),
+    time_(0)
+{
+  std::chrono::duration<int, std::milli> ms = std::chrono::duration_cast<std::chrono::milliseconds>(time.subseconds());
+  setHMS(time.hours().count(), time.minutes().count(), time.seconds().count(), ms.count());
+}
+#endif
+
 bool WTime::setHMS(int h, int m, int s, int ms)
 {
   null_ = false;
@@ -649,9 +660,9 @@ WTime::RegExpInfo WTime::formatToRegExp(const WT_USTRING& format)
   int currentGroup = 1;
 
   result.hourGetJS = "return 1";
-  result.minuteGetJS = "return 1";
-  result.secGetJS = "return 1";
-  result.msecGetJS = "return 1";
+  result.minuteGetJS = "return 0";
+  result.secGetJS = "return 0";
+  result.msecGetJS = "return 0";
 
   //result.regexp = "^";
   bool inQuote = false;

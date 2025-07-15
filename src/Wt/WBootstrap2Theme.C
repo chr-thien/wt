@@ -16,6 +16,7 @@
 #include "Wt/WEnvironment.h"
 #include "Wt/WFormWidget.h"
 #include "Wt/WGoogleMap.h"
+#include "Wt/WIconPair.h"
 #include "Wt/WInPlaceEdit.h"
 #include "Wt/WLabel.h"
 #include "Wt/WLink.h"
@@ -154,8 +155,8 @@ void WBootstrap2Theme::apply(WWidget *widget,
     child->addStyleClass("accordion-heading");
     break;
   case PanelCollapseButton:
-    child->setFloatSide(Side::Left);
-    // fallthrough
+    child->addStyleClass("Wt-collapse-button");
+    WT_FALLTHROUGH
   case PanelTitle:
     child->addStyleClass("accordion-toggle");
     break;
@@ -362,13 +363,13 @@ void WBootstrap2Theme::apply(WWidget *widget,
       }
 
       WDateEdit *dateEdit = dynamic_cast<WDateEdit *>(widget);
-      if (dateEdit) {
+      if (dateEdit && !dateEdit->nativeControl()) {
         element.addPropertyWord(Property::Class, "Wt-dateedit");
         return;
       }
 
       WTimeEdit *timeEdit = dynamic_cast<WTimeEdit *>(widget);
-      if (timeEdit) {
+      if (timeEdit && !timeEdit->nativeControl()) {
         element.addPropertyWord(Property::Class, "Wt-timeedit");
         return;
       }

@@ -16,6 +16,9 @@
 #include "Wt/WResource.h"
 #include "Wt/WServer.h"
 #include "Wt/WTimerWidget.h"
+#ifndef WT_TARGET_JAVA
+#include "Wt/WWebSocketResource.h"
+#endif // WT_TARGET_JAVA
 #include "Wt/Http/Request.h"
 
 #include "CgiParser.h"
@@ -464,7 +467,7 @@ bool WebSession::useUglyInternalPaths() const
 #endif
 }
 
-std::string WebSession::bootstrapUrl(const WebResponse& response,
+std::string WebSession::bootstrapUrl(WT_MAYBE_UNUSED const WebResponse& response,
                                      BootstrapOption option) const
 {
   switch (option) {
@@ -667,7 +670,7 @@ std::string WebSession::appendInternalPath(const std::string& baseUrl,
   if (internalPath.empty() || internalPath == "/")
     if (baseUrl.empty())
       if (applicationName_.empty())
-        return ".";
+        return "";
       else
         return applicationName_;
     else
@@ -1292,12 +1295,21 @@ void WebSession::handleRequest(Handler& handler)
   const char *origin = request.headerValue("Origin");
   if (request.isWebSocketRequest()) {
     std::string trustedOrigin = env_->urlScheme() + "://" + env_->hostName();
+
+#ifndef WT_TARGET_JAVA
+    // Fallback if the WebSocket was generated on the framework WebSocket.
+    // The origin would remain "http(s)", but the urlScheme would already be "ws(s)".
+    std::string wsTrustedOrigin = (env_->urlScheme() == "ws" ? "http://" : "https://") + env_->hostName();
+#endif // WT_TARGET_JAVA
     // Allow new WebSocket connection:
     // - Origin is OK if:
     //  - It is the same as the current host
     //  - or we are using WidgetSet mode and the origin is allowed
     // - Wt session id matches
     if (origin && (trustedOrigin == origin ||
+#ifndef WT_TARGET_JAVA
+                   wsTrustedOrigin == origin ||
+#endif // WT_TARGET_JAVA
                    (type() == EntryPointType::WidgetSet && conf.isAllowedOrigin(origin))) &&
         wtdE && *wtdE == sessionId_) {
       // OK
@@ -1374,10 +1386,13 @@ void WebSession::handleRequest(Handler& handler)
       throw new WException("Server does not implement JSR-356 for WebSockets");
     }
 #else
-    if (state_ != State::JustCreated) {
+    if (state_ != State::JustCreated && requestE && *requestE == "ws") {
+      // This is the framework-internal rendering websocket
       handleWebSocketRequest(handler);
       return;
-    } else {
+    } else if (!requestForResource) {
+      // Other websocket requests, not intended for WWebSocketResources,
+      // are not expected.
       handler.flushResponse();
       kill();
       return;
@@ -2467,8 +2482,45 @@ void WebSession::notify(const WEvent& event)
 
           if (resource) {
             try {
+#ifndef WT_TARGET_JAVA
+              // Requests to WebSocketResources need some special handling:
+              // after the handshake is done, the socket is transferred to
+              // the WWebSocketConnection for further communication
+              WWebSocketResource* wsResource = nullptr;
+              if (request.isWebSocketRequest()) {
+                wsResource = app_->findMatchingWebSocketResource(resource);
+                if (!wsResource) {
+                  LOG_ERROR("websocket: resource '" << *resourceE
+                      << "' is not a WWebSocketResource");
+                  handler.response()->setStatus(400);
+                  handler.response()->setContentType("text/html");
+                  handler.response()->out() <<
+                    "<html><body><h1>Not a websocket</h1></body></html>";
+                  handler.flushResponse();
+                  return;
+                } else if (!response.supportsTransferWebSocketResourceSocket()) {
+                  // this http frontend type does not work with WebSocketResources
+                  LOG_ERROR("websocket: websocket resources not supported by HTTP frontend");
+                  handler.response()->setStatus(500);
+                  handler.response()->setContentType("text/html");
+                  handler.response()->out() <<
+                    "<html><body><h1>WebSockets not supported</h1></body></html>";
+                  handler.flushResponse();
+                  return;
+                }
+              }
+#endif // WT_TARGET_JAVA
               resource->handle(&request, &response);
               handler.setRequest(nullptr, nullptr);
+#ifndef WT_TARGET_JAVA
+              if (wsResource) {
+                // note: when first written, status was always 101
+                if (response.status() == 101) {
+                  // status 101 -> send response and transfer socket
+                  request.setTransferWebSocketResourceSocketCallBack(std::bind(&WebSocketHandlerResource::moveSocket, wsResource->handleResource(), std::placeholders::_1, std::placeholders::_2));
+                }
+              }
+#endif // WT_TARGET_JAVA
             } catch (std::exception& e) {
               LOG_ERROR("Exception while streaming resource" << e.what());
               RETHROW(e);
@@ -2694,8 +2746,6 @@ EventType WebSession::getEventType(const WEvent& event) const
 
   if (event.impl_.renderOnly || !handler.request())
     return EventType::Other;
-
-  const std::string *requestE = request.getParameter("request");
 
   const std::string *pageIdE = handler.request()->getParameter("pageId");
   if (pageIdE && *pageIdE != std::to_string(renderer_.pageId()))

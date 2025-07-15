@@ -23,6 +23,7 @@ namespace Wt {
 
 class Configuration;
 class EntryPoint;
+class WebSocketConnection;
 class WSslInfo;
 
 /*
@@ -50,6 +51,7 @@ public:
   typedef std::function<void(WebWriteEvent)> WriteCallback;
   typedef std::function<void(WebReadEvent)> ReadCallback;
   typedef std::function<void(void)> DisconnectCallback;
+  typedef std::function<void(const Http::Request &request, std::shared_ptr<WebSocketConnection>)> WebSocketResourceTransferCallback;
 
   /*
    * Signal that the response should be flushed.
@@ -80,6 +82,17 @@ public:
    * for more incoming events.
    */
   virtual bool webSocketMessagePending() const;
+
+  /*
+   * When a connection to a WWebSocketResource is set up, the socket is
+   * transferred from the http server to the resource using this callback.
+   *
+   * Possibly not supported by all front-ends.
+   */
+  virtual bool supportsTransferWebSocketResourceSocket() = 0;
+  void setTransferWebSocketResourceSocketCallBack(WebSocketResourceTransferCallback cb);
+  bool hasTransferWebSocketResourceSocketCallBack();
+  void transferWebSocketResourceSocket(const std::shared_ptr<WebSocketConnection> &socket);
 
   /*
    * Indicate that we're deferring to write a response, but in the mean-time
@@ -120,6 +133,11 @@ public:
   virtual void setStatus(int status) = 0;
 
   /*
+   * returns current status value
+   */
+  virtual int status() = 0;
+
+  /*
    * Sets the content-type for a normal response.
    */
   virtual void setContentType(const std::string& value) = 0;
@@ -133,6 +151,14 @@ public:
    * Adds a header for a normal response.
    */
   virtual void addHeader(const std::string& name, const std::string& value) = 0;
+
+  /*
+   * Inserts a header for a normal response.
+   *
+   * Inserting will not always add the header, but can replace an
+   * existing header value if one with the same name is already created.
+   */
+  virtual void insertHeader(const std::string& name, const std::string& value) = 0;
 
   /*
    * Returns request information, which are not http headers.
@@ -267,6 +293,7 @@ public:
 
   std::string urlScheme(const Configuration & conf) const;
 
+  const std::string& nonce() const { return nonce_; }
 protected:
   const EntryPoint *entryPoint_;
   std::size_t extraStartIndex_;
@@ -285,14 +312,17 @@ protected:
 
 private:
   std::string parsePreferredAcceptValue(const char *value) const;
+  void addNonce();
 
   ::int64_t postDataExceeded_;
   Http::ParameterMap parameters_;
   Http::UploadedFileMap files_;
   ResponseType responseType_;
   bool webSocketRequest_;
+  WebSocketResourceTransferCallback wsResourceTransferCb_;
   std::chrono::high_resolution_clock::time_point start_;
   std::vector<std::pair<std::string, std::string> > urlParams_;
+  std::string nonce_;
 
   static Http::ParameterValues emptyValues_;
 

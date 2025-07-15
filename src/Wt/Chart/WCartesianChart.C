@@ -289,7 +289,7 @@ SeriesIterator::~SeriesIterator()
 { }
 
 void SeriesIterator::startSegment(int currentXSegment, int currentYSegment,
-                                  const WRectF& currentSegmentArea)
+                                  WT_MAYBE_UNUSED const WRectF& currentSegmentArea)
 {
   currentXSegment_ = currentXSegment;
   currentYSegment_ = currentYSegment;
@@ -299,8 +299,10 @@ void SeriesIterator::endSegment()
 {
 }
 
-bool SeriesIterator::startSeries(const WDataSeries& series, double groupWidth,
-                                 int numBarGroups, int currentBarGroup)
+bool SeriesIterator::startSeries(WT_MAYBE_UNUSED const WDataSeries& series,
+                                 WT_MAYBE_UNUSED double groupWidth,
+                                 WT_MAYBE_UNUSED int numBarGroups,
+                                 WT_MAYBE_UNUSED int currentBarGroup)
 {
   return true;
 }
@@ -308,10 +310,14 @@ bool SeriesIterator::startSeries(const WDataSeries& series, double groupWidth,
 void SeriesIterator::endSeries()
 { }
 
-void SeriesIterator::newValue(const WDataSeries& series,
-                              double x, double y, double stackY,
-                              int xRow, int xColumn,
-                              int yRow, int yColumn)
+void SeriesIterator::newValue(WT_MAYBE_UNUSED const WDataSeries& series,
+                              WT_MAYBE_UNUSED double x,
+                              WT_MAYBE_UNUSED double y,
+                              WT_MAYBE_UNUSED double stackY,
+                              WT_MAYBE_UNUSED int xRow,
+                              WT_MAYBE_UNUSED int xColumn,
+                              WT_MAYBE_UNUSED int yRow,
+                              WT_MAYBE_UNUSED int yColumn)
 { }
 
 
@@ -447,8 +453,9 @@ public:
     curve_.setOpenSubPathsEnabled(true);
   }
 
-  virtual void addValue(double x, double y, double stacky,
-                        int xRow, int xColumn, int yRow, int yColumn) override {
+  virtual void addValue(double x, double y, WT_MAYBE_UNUSED double stackY,
+                        WT_MAYBE_UNUSED int xRow, WT_MAYBE_UNUSED int xColumn,
+                        WT_MAYBE_UNUSED int yRow, WT_MAYBE_UNUSED int yColumn) override {
     WPointF p = chart_.map(x, y, chart_.xAxis(series_.xAxis()), chart_.yAxis(series_.yAxis()),
                            it_.currentXSegment(), it_.currentYSegment());
 
@@ -912,7 +919,7 @@ void SeriesRenderIterator::endSeries()
   series_ = nullptr;
 }
 
-void SeriesRenderIterator::newValue(const WDataSeries& series,
+void SeriesRenderIterator::newValue(WT_MAYBE_UNUSED const WDataSeries& series,
                                     double x, double y,
                                     double stackY,
                                     int xRow, int xColumn,
@@ -957,8 +964,8 @@ public:
 
   virtual void newValue(const WDataSeries& series, double x, double y,
                         double stackY,
-                        int xRow, int xColumn,
-                        int yRow, int yColumn) override
+                        WT_MAYBE_UNUSED int xRow, WT_MAYBE_UNUSED int xColumn,
+                        WT_MAYBE_UNUSED int yRow, WT_MAYBE_UNUSED int yColumn) override
   {
     if (Utils::isNaN(x) || Utils::isNaN(y))
       return;
@@ -1045,8 +1052,8 @@ public:
       series_(0)
   { }
 
-  virtual bool startSeries(const WDataSeries& series, double groupWidth,
-                           int numBarGroups, int currentBarGroup) override
+  virtual bool startSeries(WT_MAYBE_UNUSED const WDataSeries& series, WT_MAYBE_UNUSED double groupWidth,
+                           WT_MAYBE_UNUSED int newBarGroups, WT_MAYBE_UNUSED int currentBarGroup) override
   {
     marker_ = WPainterPath();
 
@@ -1071,7 +1078,7 @@ public:
   }
 
   virtual void newValue(const WDataSeries& series, double x, double y,
-                        double stackY,
+                        WT_MAYBE_UNUSED double stackY,
                         int xRow, int xColumn,
                         int yRow, int yColumn) override
   {
@@ -1271,13 +1278,15 @@ public:
       matchedYColumn_(-1)
   { }
 
-  bool startSeries(const WDataSeries &series, double groupWidth, int numBarGroups, int currentBarGroup) override
+  bool startSeries(WT_MAYBE_UNUSED const WDataSeries &series, double groupWidth,
+                   WT_MAYBE_UNUSED int numBarGroups, WT_MAYBE_UNUSED int currentBarGroup) override
   {
     return matchedSeries_ == nullptr &&
         (series.type() == SeriesType::Point || series.type() == SeriesType::Point || series.type() == SeriesType::Curve);
   }
 
-  void newValue(const WDataSeries &series, double x, double y, double stackY, int xRow, int xColumn, int yRow, int yColumn) override
+  void newValue(const WDataSeries &series, double x, double y, WT_MAYBE_UNUSED double stackY,
+                int xRow, int xColumn, int yRow, int yColumn) override
   {
     if (matchedSeries_)
       return; // we already have a match
@@ -1967,11 +1976,11 @@ std::unique_ptr<WWidget> WCartesianChart::createLegendItemWidget(int index)
   label->setVerticalAlignment(AlignmentFlag::Top);
   legendItem->addWidget(std::move(label));
 
-  return std::move(legendItem);
+  return legendItem;
 }
 
-void WCartesianChart::addDataPointArea(const WDataSeries& series,
-                                       int xRow, int xColumn,
+void WCartesianChart::addDataPointArea(WT_MAYBE_UNUSED const WDataSeries& series,
+                                       WT_MAYBE_UNUSED int xRow, WT_MAYBE_UNUSED int xColumn,
                                        std::unique_ptr<WAbstractArea> area)
 {
   if (areas().empty())
@@ -3074,7 +3083,8 @@ void WCartesianChart::paintEvent(WPaintDevice *paintDevice)
       ss << "width:" << Utils::round_js_str(xAxes_[i].calculatedWidth, 16, buf) << ',';
       ss << "side:'" << locToJsString(xAxes_[i].location.initLoc) << "',";
       ss << "minOffset:" << xAxes_[i].location.minOffset << ',';
-      ss << "maxOffset:" << xAxes_[i].location.maxOffset;
+      ss << "maxOffset:" << xAxes_[i].location.maxOffset << ',';
+      ss << "scale:" << static_cast<int>(xAxes_[i].axis->scale());
       ss << '}';
     }
     ss << "],";
@@ -3086,7 +3096,8 @@ void WCartesianChart::paintEvent(WPaintDevice *paintDevice)
       ss << "width:" << Utils::round_js_str(yAxes_[i].calculatedWidth, 16, buf) << ',';
       ss << "side:'" << locToJsString(yAxes_[i].location.initLoc) << "',";
       ss << "minOffset:" << yAxes_[i].location.minOffset << ',';
-      ss << "maxOffset:" << yAxes_[i].location.maxOffset;
+      ss << "maxOffset:" << yAxes_[i].location.maxOffset << ',';
+      ss << "scale:" << static_cast<int>(yAxes_[i].axis->scale());
       ss << '}';
     }
     ss << "]});";
@@ -4614,6 +4625,8 @@ void WCartesianChart::renderLegend(WPainter& painter) const
           xOffset += 5;
         }
         break;
+      default:
+        break;
       }
     } else {
       switch (legendSide()) {
@@ -4628,6 +4641,8 @@ void WCartesianChart::renderLegend(WPainter& painter) const
         break;
       case Side::Right:
         xOffset = -5;
+        break;
+      default:
         break;
       }
     }

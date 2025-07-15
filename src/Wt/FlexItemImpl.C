@@ -17,7 +17,7 @@
 
 namespace Wt {
 
-LOGGER("WWidgetItem");
+WT_MAYBE_UNUSED LOGGER("WWidgetItem");
 
 FlexItemImpl::FlexItemImpl(WWidgetItem *item)
   : item_(item)
@@ -42,9 +42,24 @@ int FlexItemImpl::minimumHeight() const
     return static_cast<int>(item_->widget()->minimumHeight().toPixels());
 }
 
-DomElement *FlexItemImpl::createDomElement(DomElement *parent,
-                                           bool fitWidth, bool fitHeight,
-                                           WApplication *app)
+int FlexItemImpl::maximumWidth() const
+{
+  if (item_->widget()->isHidden())
+    return 0;
+  else
+    return static_cast<int>(item_->widget()->maximumWidth().toPixels());
+}
+
+int FlexItemImpl::maximumHeight() const
+{
+  if (item_->widget()->isHidden())
+    return 0;
+  else
+    return static_cast<int>(item_->widget()->maximumHeight().toPixels());
+}
+
+DomElement *FlexItemImpl::createDomElement(WT_MAYBE_UNUSED DomElement* parent, WT_MAYBE_UNUSED bool fitWidth,
+                                           WT_MAYBE_UNUSED bool fitHeight, WApplication *app)
 {
   WWidget *w = item_->widget();
 

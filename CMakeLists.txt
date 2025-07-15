@@ -11,7 +11,7 @@ SET(CMAKE_MODULE_PATH
 )
 
 SET(VERSION_SERIES 4)
-SET(VERSION_MAJOR 10)
+SET(VERSION_MAJOR 11)
 SET(VERSION_MINOR 4)
 
 IF(NOT SHARED_LIBS)
@@ -108,6 +108,10 @@ SET(LIB_INSTALL_DIR "lib" CACHE STRING
 
 SET(CMAKE_INSTALL_DIR "${LIB_INSTALL_DIR}/cmake" CACHE STRING
   "Name for CMake package configuration directory within ${CMAKE_INSTALL_PREFIX}")
+
+if(NOT DEFINED CMAKE_INSTALL_INCLUDEDIR)
+  set(CMAKE_INSTALL_INCLUDEDIR ${CMAKE_INSTALL_PREFIX}/include)
+endif()
 
 IF(WIN32)
 
@@ -233,6 +237,20 @@ ELSE(WIN32)
 ENDIF(WIN32)
 OPTION(CONNECTOR_HTTP "Compile in stand-alone httpd connector (libwthttp) ?" ON)
 SET(EXAMPLES_CONNECTOR wthttp CACHE STRING "Connector used for examples")
+
+SET(WT_CPP17_FILESYSTEM_IMPLEMENTATION "boost" CACHE STRING
+  "Implementation for Wt::cpp17::filesystem. Defaults to \"boost\", but can be set to \"std\" for std::filesystem.")
+SET_PROPERTY(CACHE WT_CPP17_FILESYSTEM_IMPLEMENTATION PROPERTY STRINGS boost std)
+IF (${WT_CPP17_FILESYSTEM_IMPLEMENTATION} STREQUAL "boost")
+  SET(WT_FILESYSTEM_IMPL_BOOST ON)
+ELSEIF(${WT_CPP17_FILESYSTEM_IMPLEMENTATION} STREQUAL "std")
+  SET(WT_FILESYSTEM_IMPL_STD ON)
+  IF (NOT CMAKE_CXX_STANDARD GREATER 17)
+    SET(WT_FILESYSTEM_IMPL_STD_CLOCK_17 ON)
+  ENDIF()
+ELSE()
+  MESSAGE(FATAL_ERROR "WT_CPP17_FILESYSTEM_IMPLEMENTATION must be boost or std")
+ENDIF()
 
 include (CheckSymbolExists)
 
@@ -383,9 +401,13 @@ ELSE (${WT_CPP17_ANY_IMPLEMENTATION} STREQUAL "thelink2012")
   MESSAGE(FATAL_ERROR "WT_CPP17_ANY_IMPLEMENTATION must be one of thelink2012, experimental, or std")
 ENDIF (${WT_CPP17_ANY_IMPLEMENTATION} STREQUAL "thelink2012")
 
-SET(WT_CPP20_DATE_TZ_DEFAULT_IMPLEMENTATION "date")
+IF((CMAKE_CXX_STANDARD EQUAL 20) OR (CMAKE_CXX_STANDARD GREATER 20))
+  SET(WT_CPP20_DATE_TZ_DEFAULT_IMPLEMENTATION "std")
+ELSE()
+  SET(WT_CPP20_DATE_TZ_DEFAULT_IMPLEMENTATION "date")
+ENDIF()
 SET(WT_CPP20_DATE_TZ_IMPLEMENTATION ${WT_CPP20_DATE_TZ_DEFAULT_IMPLEMENTATION} CACHE STRING
-  "Implementation for Wt::cpp20::date. Defaults to \"date\": an included implementation of date and timezone support by Howard Hinnant. Use \"std\" for C++20's \"std::chrono\" implementation.")
+  "Implementation for Wt::cpp20::date. Defaults to \"${WT_CPP20_DATE_TZ_DEFAULT_IMPLEMENTATION}\". Use \"date\" to resort to the included implementation of date and timezone support by Howard Hinnant. Otherwise, use \"std\" for C++20's \"std::chrono\" implementation.")
 SET_PROPERTY(CACHE WT_CPP20_DATE_TZ_IMPLEMENTATION PROPERTY STRINGS date std)
 
 IF (${WT_CPP20_DATE_TZ_IMPLEMENTATION} STREQUAL "date")

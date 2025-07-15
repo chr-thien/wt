@@ -75,6 +75,11 @@ namespace {
       delete request_;
     }
 
+    bool supportsTransferWebSocketResourceSocket() override
+    {
+      return false;
+    }
+
     virtual void flush(ResponseState state, const WriteCallback& callback) override
     {
       out().flush();
@@ -105,6 +110,11 @@ namespace {
           status_ = status;
     }
 
+    int status() override
+    {
+      return status_;
+    }
+
     virtual void setContentType(const std::string& value) override
     {
       addHeader("Content-Type", value);
@@ -117,6 +127,11 @@ namespace {
       else
         LOG_WARN("addHeader(): " << name << ": " << value
                  << " ignored because headers already committed.");
+    }
+
+    void insertHeader(const std::string& name, const std::string& value) override
+    {
+      addHeader(name, value);
     }
 
     virtual void setContentLength(::int64_t length) override

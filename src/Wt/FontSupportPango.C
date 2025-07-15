@@ -23,6 +23,8 @@
 #include <pango/pango.h>
 #include <pango/pangoft2.h>
 
+#include <memory>
+
 #ifndef DOXYGEN_ONLY
 
 namespace {
@@ -45,7 +47,7 @@ int pangoUnitsFromDouble(const double u)
 
 static Wt::FontSupport::EnabledFontFormats enabledFontFormats = Wt::FontSupport::AnyFont;
 
-void addTrueTypePattern(FcPattern *pattern, gpointer data)
+void addTrueTypePattern(FcPattern *pattern, WT_MAYBE_UNUSED gpointer data)
 {
   if (enabledFontFormats == Wt::FontSupport::TrueTypeOnly) {
     FcChar8 font_format[] = "TrueType";
@@ -53,16 +55,24 @@ void addTrueTypePattern(FcPattern *pattern, gpointer data)
   }
 }
 
+// Custom deleter for the font map, to avoid leaks.
+struct PangoFontMapDeleter {
+  void operator()(PangoFontMap* fontMap) {
+    g_object_unref(fontMap);
+  }
+};
+
 /*
- * A global font map, since this one leaks as hell, and it cannot stand
- * being used in thread local storage since cleanup (with thread exit)
- * doesn't work properly.
+ * A global font map, since it cannot stand being used in thread local
+ * storage since cleanup (with thread exit) doesn't work properly.
+ *
+ * WT-11954: The memory leaking was resolved by correctly releasing
+ * the allocated GLib object.
  *
  * It is not clear what operations involving the font map are thread-safe,
  * so here we serialize everything using a mutex.
  */
-
-PangoFontMap *pangoFontMap = nullptr;
+std::unique_ptr<PangoFontMap, PangoFontMapDeleter> pangoFontMap = nullptr;
 
 #ifdef WT_THREADED
 std::recursive_mutex pangoMutex;
@@ -100,20 +110,20 @@ std::string FontSupport::FontMatch::fileName() const
 FontSupport::FontSupport(WPaintDevice *paintDevice, EnabledFontFormats enabledFontFormats)
   : device_(paintDevice),
     enabledFontFormats_(enabledFontFormats),
-    cache_(10)
+    lruCache_(10)
 {
   PANGO_LOCK;
 
   if (!pangoFontMap) {
-    pangoFontMap = pango_ft2_font_map_new();
+    pangoFontMap.reset(pango_ft2_font_map_new());
 
 #if PANGO_VERSION_CHECK(1, 48, 0)
-    pango_fc_font_map_set_default_substitute(PANGO_FC_FONT_MAP(pangoFontMap),
+    pango_fc_font_map_set_default_substitute(PANGO_FC_FONT_MAP(pangoFontMap.get()),
                                              addTrueTypePattern,
                                              nullptr,
                                              nullptr);
 #else
-    pango_ft2_font_map_set_default_substitute(PANGO_FT2_FONT_MAP(pangoFontMap),
+    pango_ft2_font_map_set_default_substitute(PANGO_FT2_FONT_MAP(pangoFontMap.get()),
                                               addTrueTypePattern,
                                               nullptr,
                                               nullptr);
@@ -121,9 +131,9 @@ FontSupport::FontSupport(WPaintDevice *paintDevice, EnabledFontFormats enabledFo
   }
 
 #if PANGO_VERSION_MAJOR > 1 || PANGO_VERSION_MINOR > 21
-  context_ = pango_font_map_create_context(pangoFontMap);
+  context_.reset(pango_font_map_create_context(pangoFontMap.get()));
 #else
-  context_ = pango_ft2_font_map_create_context(PANGO_FT2_FONT_MAP(pangoFontMap));
+  context_.reset(pango_ft2_font_map_create_context(PANGO_FT2_FONT_MAP(pangoFontMap.get())));
 #endif
 
   currentFont_ = nullptr;
@@ -133,14 +143,7 @@ FontSupport::~FontSupport()
 {
   PANGO_LOCK;
 
-  for (MatchCache::iterator i = cache_.begin(); i != cache_.end(); ++i) {
-    if (i->match) {
-      g_object_unref(i->match);
-      pango_font_description_free(i->desc);
-    }
-  }
-
-  g_object_unref(context_);
+  lruCache_.clear();
 }
 
 bool FontSupport::canRender() const
@@ -205,10 +208,11 @@ PangoFontDescription *FontSupport::createFontDescription(const WFont& f) const
 
 FontSupport::FontMatch FontSupport::matchFont(const WFont& f) const
 {
-  for (MatchCache::iterator i = cache_.begin(); i != cache_.end(); ++i) {
+  for (MatchCache::iterator i = lruCache_.begin(); i != lruCache_.end(); ++i) {
     if (i->font == f) {
-      cache_.splice(cache_.begin(), cache_, i); // implement LRU
-      return FontMatch(i->match, i->desc);
+      // Put the match at the front of the list.
+      lruCache_.splice(lruCache_.begin(), lruCache_, i);
+      return FontMatch(i->match.get(), i->desc.get());
     }
   }
 
@@ -216,24 +220,23 @@ FontSupport::FontMatch FontSupport::matchFont(const WFont& f) const
 
   enabledFontFormats = enabledFontFormats_;
 
-  PangoFontDescription *desc = createFontDescription(f);
+  std::unique_ptr<PangoFontDescription, PangoFontDescriptionDeleter> desc(createFontDescription(f));
+  std::unique_ptr<PangoFont, PangoFontDeleter> match(pango_font_map_load_font(pangoFontMap.get(), context_.get(), desc.get()));
+  pango_context_set_font_description(context_.get(), desc.get()); // for layoutText()
 
-  PangoFont *match = pango_font_map_load_font(pangoFontMap, context_, desc);
-  pango_context_set_font_description(context_, desc); // for layoutText()
+  PangoFont* matchPtr = match.get();
+  PangoFontDescription* descPtr = desc.get();
 
-  if (cache_.back().match) {
-    g_object_unref(cache_.back().match);
-    pango_font_description_free(cache_.back().desc);
+  if (lruCache_.size() >= FONT_CACHE_MAX_SIZE) {
+    lruCache_.pop_back();
   }
+  lruCache_.push_front(Matched(f, std::move(match), std::move(desc)));
 
-  cache_.pop_back();
-  cache_.push_front(Matched(f, match, desc));
-
-  return FontMatch(match, desc);
+  return FontMatch(matchPtr, descPtr);
 }
 
-void FontSupport::addFontCollection(const std::string& directory,
-                                    bool recursive)
+void FontSupport::addFontCollection(WT_MAYBE_UNUSED const std::string& directory,
+                                    WT_MAYBE_UNUSED bool recursive)
 {
 }
 
@@ -284,9 +287,9 @@ GList *FontSupport::layoutText(const WFont& font,
   FontMatch match = matchFont(font);
   PangoAttrList *attrs = pango_attr_list_new();
 
-  pango_context_set_font_description(context_, match.pangoFontDescription());
+  pango_context_set_font_description(context_.get(), match.pangoFontDescription());
   GList *items
-    = pango_itemize(context_, utf8.c_str(), 0, utf8.length(), attrs, nullptr);
+    = pango_itemize(context_.get(), utf8.c_str(), 0, utf8.length(), attrs, nullptr);
 
   width = 0;
 
@@ -532,7 +535,7 @@ void FontSupport::drawText(const WFont& font, const WRectF& rect,
   std::vector<PangoGlyphString *> glyphs;
   int width;
 
-  pango_context_set_matrix(context_, &matrix);
+  pango_context_set_matrix(context_.get(), &matrix);
 
   /*
    * Oh my god, somebody explain me why we need to do this...
@@ -542,7 +545,7 @@ void FontSupport::drawText(const WFont& font, const WRectF& rect,
             / pango_matrix_get_font_scale_factor(&matrix));
 
   GList *items = layoutText(f, utf8, glyphs, width);
-  pango_context_set_matrix(context_, nullptr);
+  pango_context_set_matrix(context_.get(), nullptr);
 
   AlignmentFlag hAlign = flags & AlignHorizontalMask;
 

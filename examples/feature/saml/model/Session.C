@@ -37,9 +37,9 @@ void Session::configureAuth()
 
   std::unique_ptr<Auth::PasswordVerifier> verifier
     = std::make_unique<Auth::PasswordVerifier>();
-  verifier->addHashFunction(std::make_unique<Auth::BCryptHashFunction>(7));
+  verifier->addHashFunction(std::make_unique<Auth::BCryptHashFunction>(12));
   myPasswordService.setVerifier(std::move(verifier));
-  myPasswordService.setAttemptThrottlingEnabled(true);
+  myPasswordService.setPasswordThrottle(std::make_unique<Wt::Auth::AuthThrottle>());
   myPasswordService.setStrengthValidator(std::make_unique<Auth::PasswordStrengthValidator>());
 
   mySamlServices.push_back(std::make_unique<SamlService>(myAuthService));

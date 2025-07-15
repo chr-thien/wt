@@ -19,6 +19,7 @@
 #include "Wt/WIOService.h"
 #include "Wt/WResource.h"
 #include "Wt/WServer.h"
+#include "Wt/WWebSocketResource.h"
 
 #include "Configuration.h"
 #include "WebController.h"
@@ -290,11 +291,29 @@ void WServer::addResource(const std::shared_ptr<WResource> &resource,
   }
 }
 
+void WServer::addResource(const std::shared_ptr<WWebSocketResource>& resource,
+                          const std::string& path)
+{
+  if (configuration_->webSockets()) {
+    bool success = configuration().tryAddResource(EntryPoint(resource->handleResource(), prependDefaultPath(path)));
+    if (success) {
+      webSocketResources_.push_back(resource);
+      resource->setInternalPath(path);
+    } else {
+      WString error(Wt::utf8("WServer::addResource() error: "
+                             "a static resource was already deployed on path '{1}'"));
+      throw WServer::Exception(error.arg(path).toUTF8());
+    }
+  } else {
+    LOG_WARN("WebSockets are disabled by config, but a WWebSocketResource is used. Resource will be unreachable.");
+  }
+}
+
 void WServer::removeEntryPoint(const std::string& path){
   configuration().removeEntryPoint(path);
 }
 
-void WServer::restart(int argc, char **argv, char **envp)
+void WServer::restart(WT_MAYBE_UNUSED int argc, char **argv, char **envp)
 {
 #ifndef WT_WIN32
   char *path = realpath(argv[0], 0);
@@ -317,7 +336,7 @@ void WServer::restart(const std::string &applicationPath,
 #ifndef WT_WIN32
   std::unique_ptr<char*[]> argv(new char*[args.size() + 1]);
   argv[0] = const_cast<char*>(applicationPath.c_str());
-  for (int i = 0; i < args.size(); ++i) {
+  for (int i = 0; i < static_cast<int>(args.size()); ++i) {
     argv[i+1] = const_cast<char*>(args[i].c_str());
   }
 

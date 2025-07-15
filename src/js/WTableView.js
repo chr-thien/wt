@@ -100,6 +100,14 @@ WT_DECLARE_WT_MEMBER(
           Math.round(height)
         );
       }
+
+      // Set the height of the contentscontainer to fit the size of the wrapping table.
+      const height = headerContainer.offsetHeight;
+      const avoidBorderOverlapOffset = 2;
+      const parentHeight = headerContainer.closest(".Wt-tableview").offsetHeight - avoidBorderOverlapOffset;
+
+      contentsContainer.style.height = parentHeight - height + "px";
+      contentsContainer.style.width = headerContainer.style.width;
     };
 
     function isSelected(item) {
@@ -272,9 +280,15 @@ WT_DECLARE_WT_MEMBER(
     };
 
     let touchStartTimer;
+    let didMove = false;
+    let isTouched = false;
+    let startingObj, startingEvent;
 
     let touches = 0;
     this.touchStart = function(obj, event) {
+      startingObj = obj;
+      startingEvent = event;
+      isTouched = true;
       if (event.touches.length > 1) {
         clearTimeout(touchStartTimer);
         touchStartTimer = setTimeout(function() {
@@ -283,9 +297,6 @@ WT_DECLARE_WT_MEMBER(
         touches = event.touches.length;
       } else {
         clearTimeout(touchStartTimer);
-        touchStartTimer = setTimeout(function() {
-          emitTouchSelect(obj, event);
-        }, 50);
         touches = 1;
       }
     };
@@ -294,16 +305,21 @@ WT_DECLARE_WT_MEMBER(
       APP.emit(el, { name: "itemTouchSelectEvent", eventObject: obj, event: event });
     }
 
-    this.touchMove = function(obj, event) {
-      if (event.touches.length === 1 && touchStartTimer) {
+    this.touchMove = function() {
+      if (touchStartTimer) {
         clearTimeout(touchStartTimer);
       }
+      didMove = true;
     };
 
-    this.touchEnd = function() {
+    this.touchEnd = function(obj, event) {
       if (touchStartTimer && touches !== 1) {
         clearTimeout(touchStartTimer);
+      } else if (isTouched && !didMove && event.touches.length === 0 && touches === 1) {
+        emitTouchSelect(startingObj, startingEvent);
       }
+      didMove = false;
+      isTouched = false;
     };
 
     this.scrolled = function(X1, X2, Y1, Y2) {
@@ -614,7 +630,8 @@ WT_DECLARE_WT_MEMBER(
       }
 
       if (
-        !WT.isIE && (scrollTop !== contentsContainer.scrollTop ||
+        !WT.isIE && !isTouched &&
+        (scrollTop !== contentsContainer.scrollTop ||
           scrollLeft !== contentsContainer.scrollLeft)
       ) {
         if (typeof scrollLeft === "undefined") {

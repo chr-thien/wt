@@ -19,8 +19,8 @@
 #include <boost/algorithm/string/trim.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 
-#include "3rdparty/rapidxml/rapidxml.hpp"
-#include "3rdparty/rapidxml/rapidxml_print.hpp"
+#include "thirdparty/rapidxml/rapidxml.hpp"
+#include "thirdparty/rapidxml/rapidxml_print.hpp"
 
 using namespace Wt::rapidxml;
 
@@ -74,16 +74,24 @@ void EncodeRefs(xml_node<> *x_node, WApplication *app,
         if (app->environment().ajax()) {
           url = app->bookmarkUrl(path);
 
-          const char *name = "onclick";
-          char *value
-            = doc->allocate_string
-            ((WT_CLASS".navigateInternalPath(event, "
-              + WWebWidget::jsStringLiteral(path) + ");").c_str());
+          // All event handlers ought to be JS, not DOM: #13501
+          // Dummy for ID generation, so we can attach JS
+          WObject dummy;
+          const char *name = "id";
+          char *value = doc->allocate_string(dummy.id().c_str());
 
           xml_attribute<> *x_click = doc->allocate_attribute(name, value);
           x_node->insert_attribute(0, x_click);
 
           addClass = "Wt-rr";
+
+          WStringStream clickJS;
+          clickJS << WT_CLASS << ".$('" << dummy.id() << "').onclick = "
+                  << "function() {"
+                  << WT_CLASS << ".navigateInternalPath(event, "
+                  << WWebWidget::jsStringLiteral(path) + ");"
+                  << "};";
+          app->doJavaScript(clickJS.str());
         } else {
           if (app->environment().agentIsSpiderBot())
             url = app->bookmarkUrl(path);

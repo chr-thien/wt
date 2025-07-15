@@ -524,6 +524,7 @@ void WTreeNode::setLabelIcon(std::unique_ptr<WIconPair> labelIcon)
 
     labelIcon_->setState(isExpanded() ? 1 : 0);
   }
+  resetLearnedSlots();
 }
 
 void WTreeNode::renderSelected(bool isSelected)
@@ -587,10 +588,12 @@ void WTreeNode::update()
   // Fix #10512: Disable newly added children visually if the main tree is disabled.
   if (tree() && tree()->isDisabled() && tree()->treeRoot()) {
     const auto root = tree()->treeRoot();
+    auto app = Wt::WApplication::instance();
+    std::string themedDisabledClass = app ? app->theme()->disabledClass() : "";
     for (WTreeNode* node : root->childNodes()) {
-      if (!node->hasStyleClass("Wt-disabled")) {
-        node->addStyleClass("Wt-disabled");
-        node->label()->addStyleClass("Wt-disabled");
+      if (!node->hasStyleClass(themedDisabledClass)) {
+        node->addStyleClass(themedDisabledClass);
+        node->label()->addStyleClass(themedDisabledClass);
       }
     }
   }

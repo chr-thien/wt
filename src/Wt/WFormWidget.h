@@ -79,7 +79,7 @@ public:
    *
    * \sa validate()
    */
-  void setValidator(const std::shared_ptr<WValidator>& validator);
+  virtual void setValidator(const std::shared_ptr<WValidator>& validator);
 
   /*! \brief Returns the validator.
    */
@@ -167,15 +167,32 @@ protected:
   /*! \internal
    * \brief Called whenever the validator is changed
    *
-   * The validator may be changed because of setValidator() being called, or because one of the
-   * validator's properties was updated, and the validator called WValidator::repaint().
+   * The validator may be changed because of setValidator() being
+   * called, or because one of the validator's properties was updated,
+   * and the validator called WValidator::repaint().
    *
-   * This can be overridden to specialize how a form widget is updated when its validator changes,
-   * e.g. changing the bottom and top of a WDateEdit's calendar.
+   * This can be overridden to specialize how a form widget is updated
+   * when its validator changes, e.g. changing the bottom and top of a
+   * WDateEdit's calendar.
    *
    * \note The base class's validatorChanged() MUST be called!
    */
   virtual void validatorChanged();
+
+  /*! \internal
+   * \brief Returns whether the validator has been changed since the
+   * last render.
+   */
+  WT_NODISCARD bool hasValidatorChanged() const noexcept;
+
+  /*! \internal
+   * \brief Called whenever the validator is needed.
+   *
+   * By default, this returns the same value as validator(), but it can
+   * be overridden to return a different validator. This allows to hide
+   * the validator from the user, while still using it internally.
+   */
+  virtual std::shared_ptr<WValidator> realValidator() const { return validator(); }
 
 private:
   static const int BIT_ENABLED_CHANGED  = 0;
@@ -183,9 +200,10 @@ private:
   static const int BIT_READONLY_CHANGED = 2;
   static const int BIT_JS_OBJECT        = 3;
   static const int BIT_VALIDATION_CHANGED = 4;
-  static const int BIT_PLACEHOLDER_CHANGED = 5;
+  static const int BIT_VALIDATOR_CHANGED = 5;
+  static const int BIT_PLACEHOLDER_CHANGED = 6;
 
-  std::bitset<6> flags_;
+  std::bitset<7> flags_;
   Signal<WValidator::Result> validated_;
   WString validationToolTip_;
 

@@ -40,6 +40,12 @@ void Response::addHeader(const std::string& name, const std::string& value)
     response_->addHeader(name, value);
 }
 
+void Response::insertHeader(const std::string& name, const std::string& value)
+{
+  if (response_)
+    response_->insertHeader(name, value);
+}
+
 ResponseContinuation *Response::createContinuation()
 {
   if (!continuation_) {
@@ -130,6 +136,11 @@ WT_BOSTREAM& Response::out()
     return *out_;
   else
     return response_->out();
+}
+
+std::string Response::nonce() const
+{
+  return response_ ? response_->nonce() : std::string();
 }
 
 Response::Response(WResource *resource, WebResponse *response,

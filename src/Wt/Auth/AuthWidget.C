@@ -3,6 +3,8 @@
  *
  * See the LICENSE file for terms of use.
  */
+#include "Wt/Auth/Mfa/AbstractMfaProcess.h"
+#include "Wt/Auth/Mfa/TotpProcess.h"
 
 #include "Wt/Auth/AbstractUserDatabase.h"
 #include "Wt/Auth/AuthModel.h"
@@ -32,6 +34,7 @@
 #include "Wt/WLineEdit.h"
 #include "Wt/WLogger.h"
 #include "Wt/WMessageBox.h"
+#include "Wt/WPasswordEdit.h"
 #include "Wt/WPushButton.h"
 #include "Wt/WText.h"
 #include "Wt/WTheme.h"
@@ -106,7 +109,7 @@ void AuthWidget::onPathChange(const std::string& path)
   handleRegistrationPath(path);
 }
 
-bool AuthWidget::handleRegistrationPath(const std::string& path)
+bool AuthWidget::handleRegistrationPath(WT_MAYBE_UNUSED const std::string& path)
 {
   if (!basePath_.empty()) {
     WApplication *app = WApplication::instance();
@@ -211,7 +214,7 @@ std::unique_ptr<WWidget> AuthWidget::createRegistrationView(const Identity& id)
 
   std::unique_ptr<RegistrationWidget> w(new RegistrationWidget(this));
   w->setModel(std::move(model));
-  return std::move(w);
+  return w;
 }
 
 void AuthWidget::letResendEmailVerification()
@@ -269,6 +272,37 @@ std::unique_ptr<WDialog> AuthWidget::createPasswordPromptDialog(Login& login)
   return std::make_unique<PasswordPromptDialog>(login, model_);
 }
 
+std::unique_ptr<Mfa::AbstractMfaProcess> AuthWidget::createMfaProcess()
+{
+  auto mfaProcess = std::make_unique<Mfa::TotpProcess>(*model()->baseAuth(), model()->users(), login());
+
+  if (model()->baseAuth()->mfaThrottleEnabled()) {
+    mfaProcess->setMfaThrottle(std::make_unique<AuthThrottle>());
+  }
+
+  return std::move(mfaProcess);
+}
+
+void AuthWidget::createMfaView()
+{
+  setTemplateText("<div>${mfa}</div>");
+  if (!mfaWidget_) {
+    mfaWidget_ = createMfaProcess();
+  }
+  Mfa::AbstractMfaProcess* defaultMfaWidget = static_cast<Mfa::AbstractMfaProcess*>(mfaWidget_.get());
+
+  if (defaultMfaWidget) {
+    const User& user = login_.user();
+    const WString& mfaSecretKey = user.identity(defaultMfaWidget->provider());
+    if (mfaSecretKey.empty()) {
+      bindWidget("mfa", defaultMfaWidget->createSetupView());
+    } else {
+      defaultMfaWidget->processEnvironment();
+      bindWidget("mfa", defaultMfaWidget->createInputView());
+    }
+  }
+}
+
 void AuthWidget::logout()
 {
   model_->logout(login_);
@@ -315,15 +349,17 @@ void AuthWidget::onLoginChange()
   if (!(isRendered() || created_))
     return;
 
-  clear();
-
-  if (login_.loggedIn()) {
+  if (login_.loggedIn() ||
+      (login_.user().isValid() && login_.state() == LoginState::RequiresMfa)) {
 #ifndef WT_TARGET_JAVA
     if (created_) // do not do this if onLoginChange() is called from create()
       WApplication::instance()->changeSessionId();
 #endif // WT_TARGET_JAVA
-
-    createLoggedInView();
+    if (login_.state() == LoginState::RequiresMfa) {
+      createMfaView();
+    } else {
+      createLoggedInView();
+    }
   } else {
     if (login_.state() != LoginState::Disabled) {
       if (model_->baseAuth()->authTokensEnabled()) {
@@ -363,15 +399,14 @@ std::unique_ptr<WWidget> AuthWidget::createFormWidget(WFormModel::Field field)
     result.reset(new WLineEdit());
     result->setFocus(true);
   } else if (field == AuthModel::PasswordField) {
-    WLineEdit *p = new WLineEdit();
+    WPasswordEdit *p = new WPasswordEdit();
     p->enterPressed().connect(this, &AuthWidget::attemptPasswordLogin);
-    p->setEchoMode(EchoMode::Password);
     result.reset(p);
   } else if (field == AuthModel::RememberMeField) {
     result.reset(new WCheckBox());
   }
 
-  return std::move(result);
+  return result;
 }
 
 void AuthWidget::updatePasswordLoginView()
@@ -578,7 +613,20 @@ void AuthWidget::processEnvironment()
     case EmailTokenState::EmailConfirmed:
       displayInfo(tr("Wt.Auth.info-email-confirmed"));
       User user = result.user();
-      model_->loginUser(login_, user);
+
+      LoginState state = LoginState::Strong;
+      if (model_->hasMfaStep(user)) {
+        state = LoginState::RequiresMfa;
+      }
+      model_->loginUser(login_, user, state);
+
+      // Immediately check the environment for MFA tokens for the user
+      if (login_.state() == LoginState::RequiresMfa) {
+        if (!mfaWidget_) {
+          mfaWidget_ = createMfaProcess();
+        }
+        mfaWidget_->processEnvironment();
+      }
     }
 
     /*
@@ -592,8 +640,19 @@ void AuthWidget::processEnvironment()
   }
 
   User user = model_->processAuthToken();
-  model_->loginUser(login_, user, LoginState::Weak);
-}
+  LoginState state = LoginState::Weak;
+  if (model_->hasMfaStep(user)) {
+    state = LoginState::RequiresMfa;
+  }
+  model_->loginUser(login_, user, state);
 
+  // Immediately check the environment for MFA tokens for the user
+  if (login_.state() == LoginState::RequiresMfa) {
+    if (!mfaWidget_) {
+      mfaWidget_ = createMfaProcess();
+    }
+    mfaWidget_->processEnvironment();
+  }
+}
   }
 }

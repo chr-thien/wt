@@ -33,8 +33,9 @@ namespace server {
 
 ProxyReply::ProxyReply(Request& request,
                        const Configuration& config,
-                       SessionProcessManager& sessionManager)
-  : Reply(request, config),
+                       SessionProcessManager& sessionManager,
+                       const Wt::Configuration* wtConfig)
+  : Reply(request, config, wtConfig),
     sessionManager_(sessionManager),
     out_(&out_buf_),
     sending_(0),
@@ -59,7 +60,8 @@ void ProxyReply::closeClientSocket()
   if (socket_) {
     Wt::AsioWrapper::error_code ignored_ec;
     socket_->shutdown(asio::ip::tcp::socket::shutdown_both, ignored_ec);
-    socket_->close();
+    socket_->cancel(ignored_ec);
+    socket_->close(ignored_ec);
     socket_.reset();
   }
 }
@@ -590,7 +592,7 @@ void ProxyReply::error(status_type status)
     setStatus(status);
     setCloseConnection();
     more_ = false;
-    setRelay(ReplyPtr(new StockReply(request_, status, configuration())));
+    setRelay(ReplyPtr(new StockReply(request_, status, configuration(), wtConfig_)));
     send();
   } else {
     connection()->close();

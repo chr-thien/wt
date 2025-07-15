@@ -4,7 +4,11 @@
  * All rights reserved.
  */
 
+#include "EntryPoint.h"
 #include "Wt/WServer.h"
+#include "Wt/WWebSocketResource.h"
+#include "Wt/WWebSocketConnection.h"
+
 #include "WtReply.h"
 #include "StockReply.h"
 #include "HTTPRequest.h"
@@ -29,13 +33,55 @@ namespace misc_strings {
   const char char0xC1 = (char)0xC1;
 }
 
+namespace {
+  bool hasStaticWebSocketResource(const std::shared_ptr<Wt::WebRequest>& webRequest)
+  {
+    const std::string& scriptName = webRequest->scriptName();
+    const std::string& pathInfo = webRequest->pathInfo();
+
+    Wt::WServer* server = Wt::WServer::instance();
+    Wt::EntryPointMatch match = server->configuration().matchEntryPoint(scriptName, pathInfo, true);
+    return match.entryPoint && match.entryPoint->resource()
+           && dynamic_cast<Wt::WebSocketHandlerResource*>(match.entryPoint->resource());
+  }
+
+  bool isNotRenderWebSocketRequest(const std::shared_ptr<Wt::WebRequest>& webRequest, int webSocketVersion)
+  {
+    const std::string queryString = webRequest->queryString();
+    bool isWebSocketResourceRequest = webSocketVersion == 13 && queryString.find("request=ws") == std::string::npos;
+    bool isStaticWebSocketRequest = webSocketVersion == 13 && queryString.find("wtd=") == std::string::npos && hasStaticWebSocketResource(webRequest);
+    return isWebSocketResourceRequest || isStaticWebSocketRequest;
+  }
+
+  void moveTcpWebSocket(const std::shared_ptr<Wt::WebRequest>& webRequest,
+    std::unique_ptr<Wt::AsioWrapper::asio::ip::tcp::socket> socket)
+  {
+    socket.get()->cancel();
+
+    auto socketConnection = std::make_shared<Wt::WebSocketTcpConnection>(Wt::WServer::instance()->ioService(), std::move(socket));
+    webRequest->transferWebSocketResourceSocket(socketConnection);
+  }
+
+#ifdef WT_WITH_SSL
+  void moveSslWebSocket(const std::shared_ptr<Wt::WebRequest>& webRequest,
+    std::unique_ptr<Wt::AsioWrapper::asio::ssl::stream<Wt::AsioWrapper::asio::ip::tcp::socket>> socket)
+  {
+    socket.get()->next_layer().cancel();
+
+    auto socketConnection = std::make_shared<Wt::WebSocketSslConnection>(Wt::WServer::instance()->ioService(), std::move(socket));
+    webRequest->transferWebSocketResourceSocket(socketConnection);
+  }
+#endif
+}
+
 #ifdef WTHTTP_WITH_ZLIB
 static int SERVER_MAX_WINDOW_BITS = 15;
 #endif
 
 WtReply::WtReply(Request& request, const Wt::EntryPoint& entryPoint,
-                 const Configuration &config)
-  : Reply(request, config),
+                 const Configuration &config,
+                 const Wt::Configuration* wtConfig)
+  : Reply(request, config, wtConfig),
     entryPoint_(&entryPoint),
     in_(&in_mem_),
     out_(&out_buf_),
@@ -205,7 +251,7 @@ void WtReply::consumeRequestBody(const char *begin,
     if (state != Request::Partial) {
       if (status() >= 300) {
         setRelay(ReplyPtr(new StockReply(request(),
-                                         status(), configuration())));
+                                         status(), configuration(), wtConfig_)));
         Reply::send();
       } else {
         if (dynamic_cast<std::fstream *>(in_)) {
@@ -242,16 +288,58 @@ void WtReply::consumeRequestBody(const char *begin,
         if (entryPoint_->resource())
           connection()->server()->controller()->handleRequest(httpRequest_);
         else
-          connection()->server()->service().post
-            (std::bind(&Wt::WebController::handleRequest,
-                       connection()->server()->controller(),
-                       httpRequest_));
+          asio::post(connection()->server()->service(),
+                     std::bind(&Wt::WebController::handleRequest,
+                               connection()->server()->controller(),
+                               httpRequest_));
       }
     }
   } else {
     /*
-     * WebSocket connection request
+     * WebSocket connection request, either to a WWebSocketResource,
+     * or in the framework.
+     *
+     * While both connections are closed after they are handled, the
+     * request to the WWebSocketResource will have its socket transferred
+     * to a WWebSocketConnection. This class will handle the socket
+     * operations and memory.
      */
+    std::shared_ptr<HTTPRequest> webSocketHttpRequest(new HTTPRequest(std::static_pointer_cast<WtReply>
+                                                 (shared_from_this()), entryPoint_));
+    webSocketHttpRequest->setWebSocketRequest(true);
+    if (isNotRenderWebSocketRequest(webSocketHttpRequest, request().webSocketVersion)) {
+      const std::string requestScheme = request().urlScheme;
+      const std::string connectionScheme = connection()->urlScheme();
+      if (requestScheme == "ws" && connectionScheme == "http") {
+        connection()->server()->controller()->handleRequest(webSocketHttpRequest.get());
+        if (webSocketHttpRequest->hasTransferWebSocketResourceSocketCallBack()) {
+          // there's a potential race between the call the WResource's flush() and calling this
+          // method, but since this method and the handling of flush() both run with the same
+          // strand, that is ok.
+          connection()->requestTcpSocketTransfer(std::bind(&moveTcpWebSocket, webSocketHttpRequest, std::placeholders::_1));
+        } else {
+          setCloseConnection(); // precautionary
+        }
+        return;
+      } else if (requestScheme == "wss" && connectionScheme == "https") {
+        connection()->server()->controller()->handleRequest(webSocketHttpRequest.get());
+        if (webSocketHttpRequest->hasTransferWebSocketResourceSocketCallBack()) {
+#ifdef WT_WITH_SSL
+          connection()->requestSslSocketTransfer(std::bind(&moveSslWebSocket, webSocketHttpRequest, std::placeholders::_1));
+#else
+          LOG_ERROR("consumeRequestBody: Cannot transfer SSL socket, Wt was not compiled with SSL support.");
+#endif
+        } else {
+          setCloseConnection(); // precautionary
+        }
+        return;
+      } else {
+        LOG_ERROR("Connection scheme (" << connectionScheme << ") and WebSocket scheme (" << requestScheme <<  ") do not match.");
+        setStatus(bad_request);
+        setCloseConnection();
+      }
+    }
+
     setCloseConnection();
 
     switch (state) {
@@ -267,7 +355,7 @@ void WtReply::consumeRequestBody(const char *begin,
           setStatus(bad_request);
 
         setRelay
-          (ReplyPtr(new StockReply(request(), status(), configuration())));
+          (ReplyPtr(new StockReply(request(), status(), configuration(), wtConfig_)));
 
         Reply::send();
       }
@@ -344,8 +432,8 @@ bool WtReply::consumeWebSocketMessage(ws_opcode opcode,
 
       // We need to post since in Wt we may be entering a recursive event
       // loop and we need to release the strand
-      connection()->server()->service().post
-        (std::bind(cb, Wt::WebReadEvent::Error));
+      asio::post(connection()->server()->service(),
+                 std::bind(cb, Wt::WebReadEvent::Error));
 
       return false;
     } else
@@ -380,8 +468,8 @@ bool WtReply::consumeWebSocketMessage(ws_opcode opcode,
 
         // We need to post since in Wt we may be entering a recursive event
         // loop and we need to release the strand
-        connection()->server()->service().post
-          (std::bind(cb, Wt::WebReadEvent::Message));
+        asio::post(connection()->server()->service(),
+                   std::bind(cb, Wt::WebReadEvent::Message));
 
         break;
       }
@@ -394,8 +482,8 @@ bool WtReply::consumeWebSocketMessage(ws_opcode opcode,
 
         // We need to post since in Wt we may be entering a recursive event
         // loop and we need to release the strand
-        connection()->server()->service().post
-          (std::bind(cb, Wt::WebReadEvent::Ping));
+        asio::post(connection()->server()->service(),
+                   std::bind(cb, Wt::WebReadEvent::Ping));
 
         break;
       }
@@ -460,7 +548,7 @@ void WtReply::writeDone(bool success)
 }
 
 void WtReply::send(const Wt::WebRequest::WriteCallback& callBack,
-                   bool responseComplete)
+                   WT_MAYBE_UNUSED bool responseComplete)
 {
   LOG_DEBUG("WtReply::send(): " << sending_);
 
@@ -516,9 +604,10 @@ void WtReply::readWebSocketMessage(const Wt::WebRequest::ReadCallback& callBack)
   in_mem_.str("");
   in_mem_.clear();
 
-  connection()->strand().post(std::bind(&Connection::handleReadBody,
-                                        connection(),
-                                        shared_from_this()));
+  asio::post(connection()->strand(),
+             std::bind(&Connection::handleReadBody,
+                       connection(),
+                       shared_from_this()));
 }
 
 bool WtReply::readAvailable()
@@ -572,7 +661,7 @@ void WtReply::formatResponse(std::vector<asio::const_buffer>& result)
 #ifdef WTHTTP_WITH_ZLIB
         } else  {
           result.push_back(asio::buffer(&misc_strings::char0xC1, 1)); // RSV1 = 1
-          const unsigned char* data = asio::buffer_cast<const unsigned char*>(out_buf_.data());
+          const unsigned char* data = static_cast<const unsigned char*>(out_buf_.data().data());
           int size = asio::buffer_size(out_buf_.data());
           bool hasMore = false;
           payloadLength = 0;

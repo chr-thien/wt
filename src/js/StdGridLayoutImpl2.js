@@ -19,6 +19,7 @@ WT_DECLARE_WT_MEMBER(
     const STRETCH = 0;
     const RESIZABLE = 1;
     const MIN_SIZE = 2;
+    const MAX_SIZE = 3;
 
     const RS_INITIAL_SIZE = 0;
     const RS_PCT = 1;
@@ -40,7 +41,7 @@ WT_DECLARE_WT_MEMBER(
     const ALIGN_RIGHT = 0x2;
     const ALIGN_CENTER = 0x4;
 
-    const RESIZE_HANDLE_MARGIN = 2;
+    const RESIZE_HANDLE_MARGIN = 5;
     const NA = 1000000;
     const NA_px = "-" + NA + "px";
 
@@ -122,6 +123,18 @@ WT_DECLARE_WT_MEMBER(
         if (item && item.id === id) {
           return item;
         }
+      }
+
+      return null;
+    }
+
+    function getItemIndex(id) {
+      let i = 0;
+      for (const item of config.items) {
+        if (item && item.id === id) {
+          return i;
+        }
+        i += 1;
       }
 
       return null;
@@ -415,7 +428,6 @@ WT_DECLARE_WT_MEMBER(
         }
 
         const preferredSize = [], minimumSize = [];
-        let totalPreferredSize, totalMinSize;
         const measurePreferredForStretching = true;
         let spanned = false;
 
@@ -671,12 +683,6 @@ WT_DECLARE_WT_MEMBER(
 
           preferredSize[di] = dPreferred;
           minimumSize[di] = dMinimum;
-
-          if (dMinimum > -1) {
-            // FIXME: totalPreferredSize and totalMinSize are still undefined here?
-            totalPreferredSize += dPreferred;
-            totalMinSize += dMinimum;
-          }
         }
 
         if (spanned) {
@@ -753,10 +759,8 @@ WT_DECLARE_WT_MEMBER(
           }, minimumSize);
         }
 
-        // FIXME: this is where the var totalPreferredSize and totalMinSize declarations were
-        //        however, there are used of totalPreferredSize and totalMinSize before this point already
-        totalPreferredSize = 0;
-        totalMinSize = 0;
+        let totalPreferredSize = 0;
+        let totalMinSize = 0;
 
         for (let di = 0; di < dirCount; ++di) {
           if (minimumSize[di] > preferredSize[di]) {
@@ -917,6 +921,33 @@ WT_DECLARE_WT_MEMBER(
       }
     };
 
+    function maxSizeIncrease(dir, ri) {
+      const DC = DirConfig[dir];
+      let noStrechable = true;
+      let maxDelta = 0;
+      let altMaxDelta = 0; // maxDelta when no items are stretchable
+
+      let i;
+      for (i = 0; i < DC.sizes.length; ++i) {
+        if (i !== ri) {
+          if (DC.config[i][STRETCH] > 0) {
+            maxDelta += DC.sizes[i] - DC.measures[MINIMUM_SIZE][i];
+            noStrechable = false;
+          } else {
+            altMaxDelta += DC.sizes[i] - DC.measures[MINIMUM_SIZE][i];
+          }
+        }
+      }
+      if (noStrechable) {
+        maxDelta = altMaxDelta;
+      }
+      const maxSize = DC.config[ri][MAX_SIZE];
+      if (maxSize > 0) {
+        maxDelta = Math.min(maxDelta, maxSize - DC.sizes[ri]);
+      }
+      return maxDelta;
+    }
+
     function finishResize(dir, di, delta) {
       const DC = DirConfig[dir];
 
@@ -949,12 +980,20 @@ WT_DECLARE_WT_MEMBER(
       let ri;
       for (ri = di - 1; ri >= 0; --ri) {
         if (DC.sizes[ri] >= 0) {
-          minDelta = -(DC.sizes[ri] - DC.measures[MINIMUM_SIZE][ri]);
+          if (DC.config[ri][STRETCH] > 0 && DC.config[ri + 1][STRETCH] === 0) {
+            minDelta = -maxSizeIncrease(dir, ri + 1);
+          } else {
+            minDelta = -(DC.sizes[ri] - DC.measures[MINIMUM_SIZE][ri]);
+          }
           break;
         }
       }
 
-      maxDelta = DC.sizes[di] - DC.measures[MINIMUM_SIZE][di];
+      if (DC.config[ri][STRETCH] > 0 && DC.config[ri + 1][STRETCH] === 0) {
+        maxDelta = DC.sizes[di] - DC.measures[MINIMUM_SIZE][di];
+      } else {
+        maxDelta = maxSizeIncrease(dir, ri);
+      }
 
       if (rtl) {
         [minDelta, maxDelta] = [-maxDelta, -minDelta];
@@ -1114,7 +1153,9 @@ WT_DECLARE_WT_MEMBER(
       if (DC.maxSize && !DC.sizeSet) {
         // (2) adjust container width/height
         const sz = Math.min(totalPreferredSize, DC.maxSize) + otherPadding;
-        if (setCss(container, DC.size, (sz + sizePadding(container, dir)) + "px")) {
+        // Only perform the change IF no parent layout manager is used to manage the size.
+        // If one is used, it will correctly manage the content.
+        if (!container.parentNode.wtResize && setCss(container, DC.size, (sz + sizePadding(container, dir)) + "px")) {
           if (parent) {
             parent.setElDirty(parentItemWidget);
           }
@@ -1293,16 +1334,46 @@ WT_DECLARE_WT_MEMBER(
               // enlarge stretchables according to their stretch factor
               toDistribute -= totalPreferred[STRETCHABLES];
 
-              const factor = toDistribute / totalStretch;
+              let canEnlarge = true;
+              while (canEnlarge && Math.round(toDistribute) > 0) {
+                const factor = toDistribute / totalStretch;
 
-              let r = 0;
-              for (let di = 0; di < dirCount; ++di) {
-                if (stretch[di] > 0) {
-                  const oldr = r;
-                  r += stretch[di] * factor;
-                  targetSize[di] += Math.round(r) - Math.round(oldr);
-                  DC.stretched[di] = true;
+                let r = 0;
+                for (let di = 0; di < dirCount; ++di) {
+                  if (stretch[di] > 0) {
+                    const oldr = r;
+                    r += stretch[di] * factor;
+                    const sizeToAdd = Math.round(r) - Math.round(oldr);
+                    targetSize[di] += sizeToAdd;
+                    toDistribute -= sizeToAdd;
+
+                    const maxSize = DC.config[di][MAX_SIZE];
+                    if (maxSize > 0) {
+                      const oldTtargetSize = targetSize[di];
+                      targetSize[di] = Math.min(targetSize[di], maxSize);
+
+                      if (targetSize[di] === maxSize) {
+                        toDistribute += oldTtargetSize - maxSize;
+                        totalStretch -= stretch[di];
+                        stretch[di] = -1;
+                      }
+                    }
+                    DC.stretched[di] = true;
+                  }
                 }
+
+                if (totalStretch === 0) {
+                  // make unstretchables stretchables if there is
+                  // no more stretchables that can be enlarged.
+
+                  for (let di = 0; di < dirCount; ++di) {
+                    if (stretch[di] === 0) {
+                      stretch[di] = 1;
+                      ++totalStretch;
+                    }
+                  }
+                }
+                canEnlarge = totalStretch > 0;
               }
             }
           } else {
@@ -1398,7 +1469,7 @@ WT_DECLARE_WT_MEMBER(
               handle.di = di;
               handle.style.position = "absolute";
               handle.style[OC.left] = OC.margins[MARGIN_LEFT] + "px";
-              handle.style[DC.size] = DC.margins[SPACING] + "px";
+              handle.style[DC.size] = RESIZE_HANDLE_MARGIN + "px";
               if (OC.cSize) {
                 handle.style[OC.size] = (OC.cSize - OC.margins[MARGIN_RIGHT] -
                   OC.margins[MARGIN_LEFT]) + "px";
@@ -1411,8 +1482,7 @@ WT_DECLARE_WT_MEMBER(
                 startResize(dir, this, e);
               };
             }
-
-            left += RESIZE_HANDLE_MARGIN;
+            left += DC.margins[SPACING] / 2;
             setCss(handle, DC.left, left + "px");
             left += RESIZE_HANDLE_MARGIN;
           } else {
@@ -1423,13 +1493,14 @@ WT_DECLARE_WT_MEMBER(
             }
           }
 
-          resizeHandle = DC.config[di][RESIZABLE] !== 0;
-
           if (first) {
             first = false;
+          } else if (resizeHandle) {
+            left += DC.margins[SPACING] / 2;
           } else {
             left += DC.margins[SPACING];
           }
+          resizeHandle = DC.config[di][RESIZABLE] !== 0;
         } else {
           if (DC.resizeHandles[di]) {
             const handle = WT.getElement(DC.resizeHandles[di]);
@@ -1696,10 +1767,10 @@ WT_DECLARE_WT_MEMBER(
     this.setChildSize = function(widget, dir, preferredSize) {
       const colCount = DirConfig[HORIZONTAL].config.length,
         DC = DirConfig[dir];
-      let i; // FIXME: why is there an always undefined i here?
 
       const item = getItem(widget.id);
       if (item) {
+        const i = getItemIndex(widget.id);
         const di = (dir === HORIZONTAL ? i % colCount : i / colCount);
         const alignment = (item.align >> DC.alignBits) & 0xF;
 

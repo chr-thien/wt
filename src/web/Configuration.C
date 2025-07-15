@@ -12,7 +12,7 @@
 #include "WebUtils.h"
 
 #include <boost/algorithm/string.hpp>
-#include <boost/filesystem.hpp>
+#include "Wt/cpp17/filesystem.hpp"
 
 #ifdef WT_BOOST_CONF_LOCK
 #include <boost/thread.hpp>
@@ -28,8 +28,8 @@
 
 #include <Wt/AsioWrapper/system_error.hpp>
 
-#include "3rdparty/rapidxml/rapidxml.hpp"
-#include "3rdparty/rapidxml/rapidxml_print.hpp"
+#include "thirdparty/rapidxml/rapidxml.hpp"
+#include "thirdparty/rapidxml/rapidxml_print.hpp"
 
 #ifdef WT_WIN32
 #include <io.h>
@@ -197,7 +197,7 @@ Configuration::Network Configuration::Network::fromString(const std::string &s)
   const auto slashPos = s.find('/');
   if (slashPos == std::string::npos) {
     AsioWrapper::error_code ec;
-    const auto address = AsioWrapper::asio::ip::address::from_string(s, ec);
+    const auto address = AsioWrapper::asio::ip::make_address(s, ec);
     if (ec) {
       throw std::invalid_argument("'" + s + "' is not a valid IP address");
     }
@@ -205,7 +205,7 @@ Configuration::Network Configuration::Network::fromString(const std::string &s)
     return Network { address, prefixLength };
   } else {
     AsioWrapper::error_code ec;
-    const auto address = AsioWrapper::asio::ip::address::from_string(s.substr(0, slashPos), ec);
+    const auto address = AsioWrapper::asio::ip::make_address(s.substr(0, slashPos), ec);
     if (ec) {
       throw std::invalid_argument("'" + s + "' is not a valid IP address");
     }
@@ -272,6 +272,7 @@ void Configuration::reset()
   serverPushTimeout_ = 50;
   valgrindPath_ = "";
   errorReporting_ = ErrorMessage;
+  clientSideErrorReportLevel_ = Framework;
   if (!runDirectory_.empty()) // disabled by connector
     runDirectory_ = RUNDIR;
   sessionIdLength_ = 16;
@@ -293,9 +294,13 @@ void Configuration::reset()
   sessionIdCookie_ = false;
   cookieChecks_ = true;
   webglDetection_ = true;
+  delayLoadAtBoot_ = true;
   bootstrapConfig_.clear();
   numSessionThreads_ = -1;
   allowedOrigins_.clear();
+  httpHeaders_.clear();
+  useScriptNonce_ = false;
+  useXFrameSameOrigin_ = true;
 
   if (!appRoot_.empty())
     setAppRoot(appRoot_);
@@ -432,6 +437,12 @@ Configuration::ErrorReporting Configuration::errorReporting() const
   return errorReporting_;
 }
 
+Configuration::ClientSideErrorReportLevel Configuration::clientSideErrorReportingLevel() const
+{
+  READ_LOCK;
+  return clientSideErrorReportLevel_;
+}
+
 bool Configuration::debug() const
 {
   READ_LOCK;
@@ -481,7 +492,7 @@ std::vector<Configuration::Network> Configuration::trustedProxies() const {
 bool Configuration::isTrustedProxy(const std::string &ipAddress) const {
   READ_LOCK;
   AsioWrapper::error_code ec;
-  const auto address = AsioWrapper::asio::ip::address::from_string(ipAddress, ec);
+  const auto address = AsioWrapper::asio::ip::make_address(ipAddress, ec);
   if (ec) {
     return false;
   }
@@ -582,6 +593,24 @@ bool Configuration::webglDetect() const
 {
   READ_LOCK;
   return webglDetection_;
+}
+
+bool Configuration::useScriptNonce() const
+{
+  READ_LOCK;
+  return useScriptNonce_;
+}
+
+bool Configuration::delayLoadAtBoot() const
+{
+  READ_LOCK;
+  return delayLoadAtBoot_;
+}
+
+bool Configuration::useXFrameSameOrigin() const
+{
+  READ_LOCK;
+  return useXFrameSameOrigin_;
 }
 
 int Configuration::numSessionThreads() const
@@ -1074,6 +1103,17 @@ void Configuration::readApplicationSettings(xml_node<> *app)
                                "'naked', or 'stack'");
   }
 
+  std::string debugLvlStr = singleChildElementValue(app, "debug-level", "");
+
+  if (!debugLvlStr.empty()) {
+    if (debugLvlStr == "framework")
+      clientSideErrorReportLevel_ = Framework;
+    else if (debugLvlStr == "all")
+      clientSideErrorReportLevel_ = All;
+    else
+      throw WServer::Exception("<debug-level>: expecting 'script' or 'all'");
+  }
+
   setInt(app, "num-threads", numThreads_);
 
   xml_node<> *fcgi = singleChildElement(app, "connector-fcgi");
@@ -1182,6 +1222,7 @@ void Configuration::readApplicationSettings(xml_node<> *app)
   setBoolean(app, "session-id-cookie", sessionIdCookie_);
   setBoolean(app, "cookie-checks", cookieChecks_);
   setBoolean(app, "webgl-detection", webglDetection_);
+  setBoolean(app, "delay-load-at-boot", delayLoadAtBoot_);
 
   std::string plainAjaxSessionsRatioLimit
     = singleChildElementValue(app, "plain-ajax-sessions-ratio-limit", "");
@@ -1308,6 +1349,29 @@ void Configuration::readApplicationSettings(xml_node<> *app)
     headMatter_.push_back(HeadMatter(ss.str(), userAgent));
   }
 
+  std::vector<xml_node<> *> httpHeadersGroups = childElements(app, "http-headers");
+  for (unsigned i = 0; i < httpHeadersGroups.size(); ++i) {
+    std::vector<xml_node<> *> httpHeaders = childElements(httpHeadersGroups[i], "header");
+    for (unsigned i = 0; i < httpHeaders.size(); ++i) {
+      xml_node<> *httpHeader = httpHeaders[i];
+
+      std::string name, content;
+      attributeValue(httpHeader, "name", name);
+      attributeValue(httpHeader, "content", content);
+
+      if (name.empty()) {
+        throw WServer::Exception
+            ("<header> requires attribute 'name'");
+      }
+
+
+      httpHeaders_.push_back(HttpHeader(name, content));
+    }
+  }
+
+  setBoolean(app, "use-script-nonce", useScriptNonce_);
+  setBoolean(app, "x-frame-same-origin", useXFrameSameOrigin_);
+
   std::string allowedOrigins
     = singleChildElementValue(app, "allowed-origins", "");
   boost::split(allowedOrigins_, allowedOrigins, boost::is_any_of(","));
@@ -1424,8 +1488,8 @@ bool Configuration::registerSessionId(const std::string& oldId,
     if (!newId.empty()) {
       std::string socketPath = sessionSocketPath(newId);
 
-      namespace fs = boost::filesystem;
-      boost::system::error_code ignored;
+      namespace fs = cpp17::filesystem;
+      cpp17::fs_error_code ignored;
       if (fs::exists(socketPath, ignored)) {
         return false;
       }

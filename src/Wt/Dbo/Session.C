@@ -79,13 +79,12 @@ Impl::MappingInfo::MappingInfo()
 MappingInfo::~MappingInfo()
 { }
 
-void MappingInfo::init(Session& session)
+void MappingInfo::init(WT_MAYBE_UNUSED Session& session)
 {
   throw Exception("Not to be done.");
 }
 
-void MappingInfo::dropTable(Session& session,
-                            std::set<std::string>& tablesDropped)
+void MappingInfo::dropTable(WT_MAYBE_UNUSED Session& session, WT_MAYBE_UNUSED std::set<std::string>& tablesDropped)
 {
   throw Exception("Not to be done.");
 }
@@ -95,18 +94,22 @@ void MappingInfo::rereadAll()
   throw Exception("Not to be done.");
 }
 
-MetaDboBase *MappingInfo::create(Session& session)
+MetaDboBase *MappingInfo::create(WT_MAYBE_UNUSED Session& session)
 {
   throw Exception("Not to be done.");
 }
 
-void MappingInfo::load(Session& session, MetaDboBase *obj)
+void MappingInfo::load(WT_MAYBE_UNUSED Session& session, WT_MAYBE_UNUSED MetaDboBase* obj)
 {
   throw Exception("Not to be done.");
 }
 
-MetaDboBase *MappingInfo::load(Session& session, SqlStatement *statement,
-                               int& column)
+MetaDboBase *MappingInfo::load(WT_MAYBE_UNUSED Session& session, WT_MAYBE_UNUSED SqlStatement* statement, WT_MAYBE_UNUSED int& column)
+{
+  throw Exception("Not to be done.");
+}
+
+void MappingInfo::releaseMemory()
 {
   throw Exception("Not to be done.");
 }
@@ -149,7 +152,9 @@ Session::Session()
     connection_(nullptr),
     connectionPool_(nullptr),
     transaction_(nullptr),
-    flushMode_(FlushMode::Auto)
+    flushMode_(FlushMode::Auto),
+    mustDiscardChange_(true),
+    allowNestedTransaction_(true)
 { }
 
 Session::~Session()
@@ -166,9 +171,12 @@ Session::~Session()
   dirtyObjects_->clear();
   delete dirtyObjects_;
 
+  mustDiscardChange_ = false;
   for (ClassRegistry::iterator i = classRegistry_.begin();
-       i != classRegistry_.end(); ++i)
+       i != classRegistry_.end(); ++i) {
+    i->second->releaseMemory();
     delete i->second;
+  }
 }
 
 void Session::setConnection(std::unique_ptr<SqlConnection> connection)
@@ -1279,6 +1287,14 @@ void Session::load(MetaDboBase *dbo)
 {
   Impl::MappingInfo *mapping = dbo->getMapping();
   mapping->load(*this, dbo);
+}
+
+void Session::setAllowNestedTransaction(bool enable)
+{
+  allowNestedTransaction_ = enable;
+  if (!allowNestedTransaction_ && transaction_ && transaction_->transactionCount_ > 1) {
+    throw Exception("Using nested transaction while nested transaction is disable.");
+  }
 }
 
   }

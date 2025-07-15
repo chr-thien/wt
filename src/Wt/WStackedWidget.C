@@ -20,7 +20,8 @@ WStackedWidget::WStackedWidget()
     currentIndex_(-1),
     widgetsAdded_(false),
     javaScriptDefined_(false),
-    loadAnimateJS_(false)
+    loadAnimateJS_(false),
+    hasEmittedChanged_(false)
 {
   setOverflow(Overflow::Hidden);
   addStyleClass("Wt-stack");
@@ -29,6 +30,8 @@ WStackedWidget::WStackedWidget()
 void WStackedWidget::addWidget(std::unique_ptr<WWidget> widget)
 {
   WContainerWidget::addWidget(std::move(widget));
+  int index = count() - 1;
+  loadPolicies_.insert(loadPolicies_.begin() + index, ContentLoading::Eager);
 
   if (currentIndex_ == -1)
     currentIndex_ = 0;
@@ -52,6 +55,7 @@ WWidget *WStackedWidget::currentWidget() const
 void WStackedWidget::insertWidget(int index, std::unique_ptr<WWidget> widget)
 {
   WContainerWidget::insertWidget(index, std::move(widget));
+  loadPolicies_.insert(loadPolicies_.begin() + index, ContentLoading::Eager);
 
   if (currentIndex_ == -1)
     currentIndex_ = 0;
@@ -61,7 +65,9 @@ void WStackedWidget::insertWidget(int index, std::unique_ptr<WWidget> widget)
 
 std::unique_ptr<WWidget> WStackedWidget::removeWidget(WWidget *widget)
 {
+  int index = indexOf(widget);
   auto result = WContainerWidget::removeWidget(widget);
+  loadPolicies_.erase(loadPolicies_.begin() + index);
 
   if (currentIndex_ >= count()) {
     if (count() > 0)
@@ -95,6 +101,12 @@ void WStackedWidget::setCurrentIndex(int index)
 void WStackedWidget::setCurrentIndex(int index, const WAnimation& animation,
                                      bool autoReverse)
 {
+  bool hasChanged = currentIndex_ != index;
+  if (hasChanged) {
+    // Emitting can now happen again
+    hasEmittedChanged_ = false;
+  }
+
   if (!animation.empty() &&
       WApplication::instance()->environment().supportsCss3Animations() &&
       ((isRendered() && javaScriptDefined_) || !canOptimizeUpdates())) {
@@ -127,6 +139,21 @@ void WStackedWidget::setCurrentIndex(int index, const WAnimation& animation,
     if (currentIndex_ >= 0 && isRendered() && javaScriptDefined_)
       doJavaScript(jsRef() + ".wtObj.setCurrent("
                    + widget(currentIndex_)->jsRef() + ");");
+  }
+
+  // Only emit if the item has changed, or if emitting has not yet happened.
+  if ((hasChanged || !hasEmittedChanged_) && currentIndex_ >= 0) {
+    if (loadPolicies_[currentIndex_] == ContentLoading::Lazy) {
+      // Lazy loaded widgets are wrapped in a WContainerWidget
+      WContainerWidget* container = dynamic_cast<WContainerWidget*>(currentWidget());
+      if (container->count() > 0) {
+        currentWidgetChanged().emit(container->widget(0));
+        hasEmittedChanged_ = true;
+      }
+    } else {
+      currentWidgetChanged().emit(currentWidget());
+      hasEmittedChanged_ = true;
+    }
   }
 }
 
@@ -201,6 +228,11 @@ void WStackedWidget::getDomChanges(std::vector<DomElement *>& result,
                                    WApplication *app)
 {
   WContainerWidget::getDomChanges(result, app);
+}
+
+void WStackedWidget::setLoadPolicy(int index, ContentLoading loadPolicy)
+{
+  loadPolicies_[index] = loadPolicy;
 }
 
 }

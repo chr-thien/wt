@@ -343,11 +343,33 @@ public:
    */
   void setColumnResizeEnabled(bool enabled);
 
-  /*! \brief Returns whether column resizing is enabled.
+   /*! \brief Enables interactive column resizing.
+   *
+   * Enable or disable column resize handles for interactive resizing of
+   * a single column. The \p column that is passed indicated the column
+   * index in the view. The indices start from 0.
+   *
+   * Column resizing is enabled by default when JavaScript is available.
+   *
+   * \sa setColumnResizeEnabled()
+   */
+
+  void setColumnResizeEnabled(bool enabled, int column);
+
+  /*! \brief Returns whether column resizing is enabled for new columns.
    *
    * \sa setColumnResizeEnabled()
    */
   bool isColumnResizeEnabled() const { return columnResize_; }
+
+  /*! \brief Returns whether column resizing is enabled for a single column.
+   * 
+   * The \p column that is passed indicated the column index in the
+   * view. The indices start from 0.
+   * 
+   * \sa setColumnResizeEnabled()
+   */
+  bool isColumnResizeEnabled(int column) const { return columnInfo(column).resizable; }
 
   /*! \brief Changes the selection behaviour.
    *
@@ -478,6 +500,7 @@ public:
    *
    * \sa setDragEnabled(), dropEvent()
    */
+  WT_DEPRECATED("Use setEnabledDropLocations() instead.")
   void setDropsEnabled(bool enable);
 
   /*! \brief Enables drop operations (drag & drop).
@@ -750,6 +773,7 @@ public:
    *
    * \deprecated Use touchStarted() instead.
    */
+  WT_DEPRECATED("Use touchStarted() instead.")
   Signal<WModelIndex, WTouchEvent>& touchStart() { return touchStart_; }
 
   /*! \brief %Signal emitted when one or more fingers are placed on the screen.
@@ -1002,7 +1026,7 @@ protected:
     bool headerWordWrap;
     WLength width;
     observing_ptr<WWidget> extraHeaderWidget;
-    bool sorting, hidden;
+    bool sorting, hidden, resizable;
     std::shared_ptr<WAbstractItemDelegate> itemDelegate_;
 
     std::string styleClass() const;

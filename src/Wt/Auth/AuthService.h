@@ -10,6 +10,7 @@
 #include <Wt/WString.h>
 
 #include <Wt/Auth/User.h>
+#include <Wt/Auth/WAuthGlobal.h>
 
 namespace Wt {
   namespace Mail {
@@ -105,8 +106,15 @@ enum class EmailTokenState {
 /*! \brief Enumeration that describes an auth token validation state.
  */
 enum class AuthTokenState {
-  Invalid, //!< The presented auth token could be used to identify a user.
-  Valid    //!< The presented auth token was invalid
+  Invalid, //!< The presented auth token was invalid
+  Valid    //!< The presented auth token could be used to identify a user.
+};
+
+/*! \brief Enumeration that describes the possible auth token type.
+ */
+enum class AuthTokenType {
+  Password, //!< Regular username/password login
+  MFA      //!< Multi Factor Authantification
 };
 
 /*! \class EmailTokenResult Wt/Auth/AuthService.h Wt/Auth/AuthService.h
@@ -244,6 +252,10 @@ private:
  *    - lostPassword()
  *    - verifyEmailAddress()
  *    - processEmailToken()
+ *  - MFA tokens, used by multi-factor authentication functionality:
+ *    - setMfaTokenCookieName()
+ *    - setMfaTokenValidity()
+ *    - processAuthToken()
  *
  * \ingroup auth
  */
@@ -321,6 +333,10 @@ public:
    *
    * Authentication tokens are disabled by default.
    *
+   * The default name for these cookies is \p wtauth, and if MFA is
+   * enabled, their corresponding name will be \p wtauth-mfa. The name
+   * of these tokens can be changed (setMfaTokenCookieName()).
+   *
    * \sa setTokenHashFunction(), setAuthTokenValidity()
    */
   void setAuthTokensEnabled(bool enabled,
@@ -345,8 +361,11 @@ public:
    * unless the AbstractUserDatabase implementation takes this into account
    * (e.g. keeps the old token valid for a little bit longer)
    *
-   * The default Dbo UserDatabase does not handle concurrent token updates well,
+   * The default Dbo::UserDatabase does not handle concurrent token updates well,
    * so disable this option if you want to prevent that issue.
+   *
+   * \note If using MFA, processAuthToken() will also use this
+   * functionality.
    *
    * \sa processAuthToken()
    * \sa authTokenUpdateEnabled()
@@ -398,24 +417,98 @@ public:
   /*! \brief Creates and stores an authentication token for the user.
    *
    * This creates and stores a new authentication token for the given
-   * user.
+   * user. The token will expire after \p authTokenValidity minutes if
+   * \p authTokenValidity is positive and after authTokenValidity()
+   * minutes otherwise.
    *
    * The returned value is the token that may be used to re-identify
    * the user in processAuthToken().
+   * 
+   * \sa createAuthToken(const User&, AuthTokenType) const
    */
-  std::string createAuthToken(const User& user) const;
+  std::string createAuthToken(const User& user, int authTokenValidity = -1) const;
+
+  /*! \brief Creates and stores an authentication token for the user.
+   *
+   * This creates and stores a new authentication token for the given
+   * user. The token will expire after the token validity time
+   * configured for the tokens of type \p authTokenType.
+   *
+   * For AuthTokenType::Password this uses authTokenValidity(),
+   * for AuthTokenType::MFA this will utilize mfaTokenValidity().
+   *
+   * The returned value is the token that may be used to re-identify
+   * the user in processAuthToken().
+   * 
+   * \sa createAuthToken(const User&, int) const
+   */
+  std::string createAuthToken(const User& user, AuthTokenType authTokenType) const;
 
   /*! \brief Processes an authentication token.
    *
-   * This verifies an authentication token, and considers whether it matches
-   * with a token hash value stored in database. If it matches and auth token
-   * update is enabled, the token is updated with a new hash.
+   * This verifies an authentication token, and considers whether it
+   * matches with a token hash value stored in database. This indicates
+   * that the cookie a User has in their browser is still valid, and can
+   * be used to uniquely identify them.
    *
-   * \sa setAuthTokenUpdateEnabled()
+   * If it matches and auth token update is enabled
+   * (setAuthTokenUpdateEnabled()), the token is updated with a new hash.
+   * In case AbstractUserDatabase::updateAuthToken() returns -1, a new
+   * token that expires after authTokenValidity() minutes will be
+   * stored for the user.
+   *
+   * \sa setAuthTokensEnabled()
+   * \sa authTokenValidity()
    * \sa AbstractUserDatabase::updateAuthToken()
    */
   virtual AuthTokenResult processAuthToken(const std::string& token,
                                            AbstractUserDatabase& users) const;
+  
+  /*! \brief Processes an authentication token.
+   *
+   * This verifies an authentication token, and considers whether it
+   * matches with a token hash value stored in database. This indicates
+   * that the cookie a User has in their browser is still valid, and can
+   * be used to uniquely identify them.
+   *
+   * If it matches and auth token update is enabled
+   * (setAuthTokenUpdateEnabled()), the token is updated with a new
+   * hash. In case AbstractUserDatabase::updateAuthToken() returns -1,
+   * a new token is stored that will expire after the token validity
+   * time configured for the tokens of type \p authTokenType. If
+   * \p authTokenValidity is negative, then the new token will expire
+   * after authTokenValidity() minutes.
+   * 
+   * \sa setAuthTokensEnabled()
+   * \sa authTokenValidity()
+   * \sa mfaTokenValidity()
+   * \sa AbstractUserDatabase::updateAuthToken()
+   */
+  virtual AuthTokenResult processAuthToken(const std::string& token,
+                                           AbstractUserDatabase& users,
+                                           int authTokenValidity) const;
+  
+  /*! \brief Processes an authentication token.
+   *
+   * This verifies an authentication token, and considers whether it
+   * matches with a token hash value stored in database. This indicates
+   * that the cookie a User has in their browser is still valid, and can
+   * be used to uniquely identify them.
+   *
+   * If it matches and auth token update is enabled
+   * (setAuthTokenUpdateEnabled()), the token is updated with a new hash.
+   * In case AbstractUserDatabase::updateAuthToken() returns -1, a new
+   * token is stored that will expire after the token validity time
+   * configured for the tokens of type \p authTokenType.
+   *
+   * \sa setAuthTokensEnabled()
+   * \sa authTokenValidity()
+   * \sa mfaTokenValidity()
+   * \sa AbstractUserDatabase::updateAuthToken()
+   */
+  virtual AuthTokenResult processAuthToken(const std::string& token,
+                                           AbstractUserDatabase& users,
+                                           AuthTokenType authTokenType) const;
 
   /*! \brief Configures the duration for an authenticaton to remain valid.
    *
@@ -570,6 +663,197 @@ public:
   virtual void sendMail(const Mail::Message& message) const;
   //!@}
 
+  /** @name Multi-factor authentication (Time-Based One-Time Password).
+   */
+  //!@{
+  /*! \brief Sets whether multiple factors are enabled when logging in.
+   *
+   * If this is set to any value that isn't \p empty, a second factor
+   * (currently only TOTP as a default implementation) will be enabled.
+   * Instead of logging the User in with the LoginState::Strong (when
+   * authenticating with a password), the state will be set to
+   * LoginState::RequiresMfa.
+   *
+   * This indicates that the user is still required to provide an
+   * additional login step. This applied to the regular login only. Login
+   * via OAuth does not make use of MFA. The authenticator should be
+   * sufficiently secure in itself, and should be trusted.
+   *
+   * By default %Wt offers TOTP (Time-based One-time password) as a
+   * second factor. This is a code that any authenticator app/extension
+   * can generate.
+   *
+   * By default this feature is disabled.
+   *
+   * \note If a value for a \p provider is set here, MFA will be enabled.
+   * This will use TOTP by default. Any custom implementation (using
+   * Mfa::AbstractMfaProcess) will require more changes.
+   * \sa AuthWidget::createMfaProcess(), AuthWidget::createMfaView(), and
+   * AuthModel::hasMfaStep().
+   *
+   * \sa setMfaRequired(), setMfaCodeLength(), setMfaTokenValidity()
+   */
+  void setMfaProvider(const std::string& provider);
+
+  /*! \brief Returns the provider that manages the MFA step.
+   *
+   * \sa setMfaProvider()
+   */
+   const std::string& mfaProvider() const { return mfaProvider_; }
+
+  /*! \brief Returns whether a second factor is enabled when logging in.
+   *
+   * This marks that users can enable the MFA feature. This can be any
+   * implemenation of the Mfa::AbstractMfaProcess interface. %Wt supplies
+   * a single default implementation, namely Mfa::TotpProcess.
+   *
+   * For the default %Wt implementation, this means that developers can
+   * generate a TOTP secret key (Mfa::generateSecretKey()) which can be
+   * used for MFA, by means of the Mfa::TotpProcess.
+   *
+   * \sa mfaRequired(), mfaCodeLength()
+   */
+  bool mfaEnabled() const { return !mfaProvider_.empty(); }
+
+  /*! \brief Sets whether multiple factors are required when logging in.
+   *
+   * If this is set to \p true, a second factor (defaulting to TOTP) will
+   * be required on login. Instead of logging the User in with the
+   * LoginState::Strong (when authenticating with a password), the state
+   * will be set to LoginState::RequiresMfa.
+   *
+   * This will only take effect is mfaEnabled() is \p true as well (and
+   * thus if an MFA provider has been configured (setMfaProvider()). If
+   * this is the case, all users will be enforced to verify their login
+   * with an extra step, for more security.
+   *
+   * By %Wt's default implementation this will boil down to providing a
+   * TOTP code. Either this will be the first time they do this. In which
+   * case they will be given the secret key both in QR code format (using
+   * Mfa::AbstractMfaWidgget::createSetupView()), and as a string. When
+   * they enter a correct generated code, the secret will be attached to
+   * the User record as an Identity, and will be used for subsequent
+   * login attempts (using Mfa::AbstractMfaProcess::createInputView()).
+   *
+   * \sa setMfaProvider(), setMfaCodeLength(), setMfaTokenValidity()
+   */
+  void setMfaRequired(bool required);
+
+  /*! \brief Returns whether multiple factors are required when logging in.
+   *
+   * This marks that the MFA feature is enforced for all users.
+   *
+   * For %Wt's default implementation this means that upon logging in they
+   * will have to provide a TOTP code for verification.
+   *
+   * \sa setMfaRequired()
+   */
+  bool mfaRequired() const { return mfaRequired_; }
+
+  /*! \brief Sets the length of the code that is expected for MFA.
+   *
+   * This function does not make sense for all implementations of MFA.
+   *
+   * Currently %Wt ships with a TOTP implementation, in which case the
+   * code can be any length in the range [6-16]. Of course longer is
+   * "better" generally speaking.
+   *
+   * By default the length is \p 6.
+   *
+   * \note Due to the TOTP algorithm a longer code may not always make
+   * too much sense, as the code can start with a lot of leading zeroes.
+   * Generally a length of \p 6 is most often seen.
+   *
+   * \sa setMfaProvider(), setMfaRequired()
+   */
+  void setMfaCodeLength(int length);
+
+  /*! \brief Returns the length of the expected MFA codes.
+   *
+   * \sa setMfaCodeLength()
+   */
+  int mfaCodeLength() const { return mfaCodeLength_; }
+
+  /*! \brief Sets the name of the cookie used for MFA "remember-me".
+   *
+   * This name can be changed to any name the developer desires, that is
+   * a valid name for a cookie. By default this name is the same name as
+   * authTokenCookieName() with "-mfa" appended. If this name is not
+   * changed from the default, this will result in the "wtauth-mfa"
+   * name.
+   *
+   * \note No check is performed for clashing names, so this can
+   * potentially override existing cookies.
+   *
+   * \sa setMfaTokenValidity(), setAuthTokensEnabled()
+   */
+  void setMfaTokenCookieName(const std::string& name);
+
+  /*! \brief Returns the name of the MFA "remember-me" cookie.
+   *
+   * This can be configured by the developer, or otherwise uses the same
+   * name  as authTokenCookieName() with the "-mfa" suffix. If nothing is
+   * changed, the default is "wtauth-mfa".
+   */
+  const std::string& mfaTokenCookieName() const { return mfaTokenCookieName_; }
+
+  /*! \brief Returns the domain of the MFA "remember-me" cookie.
+   *
+   * This can be configured by the developer, or otherwise uses the same
+   * name as authTokenCookieDomain(). If nothing is changed, the default
+   * is an empty string.
+   *
+   * This should best be used if multiple applications are living on the
+   * same
+   */
+  void setMfaTokenCookieDomain(const std::string& domain);
+
+  /*! \brief Returns the MFA token cookie domain.
+   *
+   * \sa setMfaTokenCookieDomain()
+   */
+  const std::string& mfaTokenCookieDomain() const { return mfaTokenCookieDomain_; }
+
+  /*! \brief Sets the validity duration of the MFA "remember-me" cookie
+   *
+   * The duration is specified in minutes. So a validity of 1440 will
+   * keep the cookie valid for a whole day. This ensures that there is
+   * a limit on how long the User's MFA verification can be bypassed.
+   *
+   * From a security aspect, this value should be kept on the lower side
+   * so that a user will be required to demonstrate a TOTP code often to
+   * the application, by which they validate their identity.
+   *
+   * \sa Mfa::AbstractMfaProcess.
+   *
+   * The default duration is 90 days.
+   *
+   * \note There are limits on the validity of a cookie in some browsers,
+   * so it cannot be guaranteed that "forever" is actually applicable.
+   */
+  void setMfaTokenValidity(int validity);
+
+  /*! \brief Returns the validity span of the MFA "remember-me" cookie.
+   *
+   * \sa setMfaTokenValidity()
+   */
+  int mfaTokenValidity() const { return mfaTokenValidity_; }
+
+  /*! \brief Sets whether throttling is enabled during the MFA process.
+   *
+   * By default this is not enabled.
+   *
+   * \sa mfaThrottleEnabled(), AbstractMfaProcess::setMfaThrottle()
+   */
+  void setMfaThrottleEnabled(bool enabled);
+
+  /*! \brief Returns if throttling is enabled during the MFA process.
+   *
+   * \sa setMfaThrottleEnabled()
+   */
+  bool mfaThrottleEnabled() const { return mfaThrottleEnabled_; }
+  //!@}
+
 protected:
   /*! \brief Sends a confirmation email to the user to verify his email address.
    *
@@ -624,6 +908,15 @@ private:
   int authTokenValidity_;  // minutes
   std::string authTokenCookieName_;
   std::string authTokenCookieDomain_;
+
+  std::string mfaProvider_;
+  bool mfaRequired_;
+  int mfaCodeLength_;
+  bool mfaTokens_;
+  int mfaTokenValidity_;  // minutes
+  std::string mfaTokenCookieName_;
+  std::string mfaTokenCookieDomain_;
+  bool mfaThrottleEnabled_;
 };
 
   }

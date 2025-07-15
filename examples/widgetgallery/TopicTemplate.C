@@ -11,6 +11,7 @@
 #include <Wt/Utils.h>
 #include <Wt/WApplication.h>
 #include <Wt/WStringStream.h>
+#include <Wt/WTheme.h>
 
 TopicTemplate::TopicTemplate(const char *trKey)
   : BaseTemplate(trKey)
@@ -24,6 +25,14 @@ TopicTemplate::TopicTemplate(const char *trKey)
 
   namespaceToPackage["Chart"] = "chart";
   namespaceToPackage["Render"] = "render";
+
+  if (Wt::WApplication::instance()->theme()->name() == "bootstrap2") {
+    bindString("dl-class", "dl-horizontal");
+    bindString("row", "row-fluid");
+  } else {
+    bindString("dl-class", "row");
+    bindString("row", "row");
+  }
 }
 
 std::string TopicTemplate::getString(const std::string& varName)

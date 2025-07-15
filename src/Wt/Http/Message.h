@@ -46,6 +46,9 @@ public:
      */
     Header(const Header& other);
 
+    //! Destructor
+    ~Header() = default;
+
     /*! \brief Sets the header name.
      */
     void setName(const std::string& name);
@@ -87,6 +90,12 @@ public:
   /*! \brief Copy constructor.
    */
   Message(const Message& message);
+
+  //! Destructor
+  ~Message() = default;
+
+  //! Copy assignment operator
+  Message& operator=(const Message& other);
 
   /*! \brief Sets the status code.
    *

@@ -22,11 +22,12 @@
 
 namespace Wt {
 
-LOGGER("FlexLayout");
+WT_MAYBE_UNUSED LOGGER("FlexLayout");
 
 FlexLayoutImpl::FlexLayoutImpl(WLayout *layout, Impl::Grid& grid)
   : StdLayoutImpl(layout),
-    grid_(grid)
+    grid_(grid),
+    canAdjustLayout_(false)
 {
   const char *THIS_JS = "js/FlexLayoutImpl.js";
 
@@ -43,7 +44,7 @@ FlexLayoutImpl::FlexLayoutImpl(WLayout *layout, Impl::Grid& grid)
   }
 }
 
-bool FlexLayoutImpl::itemResized(WLayoutItem *item)
+bool FlexLayoutImpl::itemResized(WT_MAYBE_UNUSED WLayoutItem* item)
 {
   /*
    * Actually, we should only return true if the direct child's
@@ -63,7 +64,15 @@ void FlexLayoutImpl::updateDom(DomElement& parent)
 
   DomElement *div = DomElement::getForUpdate(elId_, DomElementType::DIV);
 
+  bool skipLayoutAdjust = false;
   Orientation orientation = getOrientation();
+  if (grid_.items_.size() > 0) {
+    auto layoutParentWidget = item(orientation, 0).item_->parentWidget();
+    if (layoutParentWidget && !layoutParentWidget->isEnabled()) {
+      skipLayoutAdjust = true;
+    }
+  }
+
 
   std::vector<int> orderedInserts;
   for (unsigned i = 0; i < addedItems_.size(); ++i)
@@ -87,7 +96,13 @@ void FlexLayoutImpl::updateDom(DomElement& parent)
 
   removedItems_.clear();
 
-  div->callMethod("layout.adjust()");
+  if (canAdjustLayout_) {
+    div->callMethod("layout.adjust()");
+  }
+
+  if (!canAdjustLayout_ && skipLayoutAdjust) {
+    canAdjustLayout_ = true;
+  }
 
   parent.addChild(div);
 }
@@ -138,6 +153,56 @@ int FlexLayoutImpl::minimumWidthForColumn(int col) const
   return minWidth;
 }
 
+int FlexLayoutImpl::maximumHeightForRow(int row) const
+{
+  int maxHeight = std::numeric_limits<int>::max();
+  bool isConstrained = false;
+  const unsigned colCount = grid_.columns_.size();
+  for (unsigned j = 0; j < colCount; ++j) {
+    WLayoutItem *item = grid_.items_[row][j].item_.get();
+    if (item) {
+      int itemMaxHeight = getImpl(item)->maximumHeight();
+      if (itemMaxHeight > 0) {
+        if (isConstrained) {
+          maxHeight = std::min(maxHeight, itemMaxHeight);
+        } else {
+          maxHeight = itemMaxHeight;
+          isConstrained = true;
+        }
+      }
+    }
+  }
+  if (!isConstrained) {
+    maxHeight = 0;
+  }
+  return maxHeight;
+}
+
+int FlexLayoutImpl::maximumWidthForColumn(int col) const
+{
+  int maxWidth = std::numeric_limits<int>::max();
+  bool isConstrained = false;
+  const unsigned rowCount = grid_.rows_.size();
+  for (unsigned i = 0; i < rowCount; ++i) {
+    WLayoutItem *item = grid_.items_[i][col].item_.get();
+    if (item) {
+      int itemMaxWidth = getImpl(item)->maximumWidth();
+      if (itemMaxWidth > 0) {
+        if (isConstrained) {
+          maxWidth = std::min(maxWidth, itemMaxWidth);
+        } else {
+          maxWidth = itemMaxWidth;
+          isConstrained = true;
+        }
+      }
+    }
+  }
+ if (!isConstrained) {
+    maxWidth = 0;
+  }
+  return maxWidth;
+}
+
 int FlexLayoutImpl::minimumWidth() const
 {
   const unsigned colCount = grid_.columns_.size();
@@ -162,6 +227,40 @@ int FlexLayoutImpl::minimumHeight() const
   return total + (rowCount-1) * grid_.verticalSpacing_;
 }
 
+int FlexLayoutImpl::maximumWidth() const
+{
+  const unsigned colCount = grid_.columns_.size();
+
+  int total = 0;
+
+  for (unsigned i = 0; i < colCount; ++i) {
+    int colMax = maximumWidthForColumn(i);
+    if (colMax == 0) {
+      return 0;
+    }
+    total += colMax;
+  }
+
+  return total + (colCount-1) * grid_.horizontalSpacing_;
+}
+
+int FlexLayoutImpl::maximumHeight() const
+{
+  const unsigned rowCount = grid_.rows_.size();
+
+  int total = 0;
+
+  for (unsigned i = 0; i < rowCount; ++i) {
+    int rowMax = maximumHeightForRow(i);
+    if (rowMax == 0) {
+      return 0;
+    }
+    total += rowMax;
+  }
+
+  return total + (rowCount-1) * grid_.verticalSpacing_;
+}
+
 void FlexLayoutImpl::itemAdded(WLayoutItem *item)
 {
   addedItems_.push_back(item);
@@ -175,16 +274,7 @@ void FlexLayoutImpl::itemRemoved(WLayoutItem *item)
   update();
 }
 
-void FlexLayoutImpl::update()
-{
-  WContainerWidget *c = container();
-
-  if (c) {
-    c->layoutChanged(false);
-  }
-}
-
-int FlexLayoutImpl::count(Orientation orientation) const
+int FlexLayoutImpl::count(WT_MAYBE_UNUSED Orientation orientation) const
 {
   return grid_.rows_.size() * grid_.columns_.size();
 }
@@ -206,7 +296,8 @@ Impl::Grid::Item& FlexLayoutImpl::item(Orientation orientation, int i)
 }
 
 DomElement *FlexLayoutImpl::createDomElement(DomElement *parent,
-                                             bool fitWidth, bool fitHeight,
+                                             WT_MAYBE_UNUSED bool fitWidth,
+                                             WT_MAYBE_UNUSED bool fitHeight,
                                              WApplication *app)
 {
   addedItems_.clear();
@@ -244,11 +335,11 @@ DomElement *FlexLayoutImpl::createDomElement(DomElement *parent,
     Orientation orientation = getOrientation();
 
     if (orientation == Orientation::Horizontal) {
-      margin[3] = std::max(0, margin[3] - (grid_.horizontalSpacing_) / 2);
-      margin[1] = std::max(0, margin[1] - (grid_.horizontalSpacing_ + 1) / 2);
+      margin[3] = std::max(0, margin[3]);
+      margin[1] = std::max(0, margin[1]);
     } else {
-      margin[0] = std::max(0, margin[0] - (grid_.verticalSpacing_) / 2);
-      margin[2] = std::max(0, margin[2] - (grid_.horizontalSpacing_ + 1) / 2);
+      margin[0] = std::max(0, margin[0]);
+      margin[2] = std::max(0, margin[2]);
     }
 
     ResizeSensor::applyIfNeeded(container());
@@ -362,7 +453,7 @@ Orientation FlexLayoutImpl::getOrientation() const
 }
 
 DomElement *FlexLayoutImpl::createElement(Orientation orientation,
-                                          unsigned index,
+                                          int index,
                                           int totalStretch,
                                           WApplication *app)
 {
@@ -492,23 +583,39 @@ DomElement *FlexLayoutImpl::createElement(Orientation orientation,
 
   switch (getDirection()) {
   case LayoutDirection::LeftToRight:
-    m[3] += (grid_.horizontalSpacing_ + 1) / 2;
-    m[1] += (grid_.horizontalSpacing_) / 2;
+    if (index != 0) {
+      m[3] += (grid_.horizontalSpacing_ + 1) / 2;
+    }
+    if (index != count(orientation)-1) {
+      m[1] += (grid_.horizontalSpacing_) / 2;
+    }
     break;
 
   case LayoutDirection::RightToLeft:
-    m[1] += (grid_.horizontalSpacing_ + 1) / 2;
-    m[3] += (grid_.horizontalSpacing_) / 2;
+    if (index != 0) {
+      m[1] += (grid_.horizontalSpacing_ + 1) / 2;
+    }
+    if (index != count(orientation)-1) {
+      m[3] += (grid_.horizontalSpacing_) / 2;
+    }
     break;
 
   case LayoutDirection::TopToBottom:
-    m[0] += (grid_.horizontalSpacing_ + 1) / 2;
-    m[2] += (grid_.horizontalSpacing_) / 2;
+    if (index != 0) {
+      m[0] += (grid_.horizontalSpacing_ + 1) / 2;
+    }
+    if (index != count(orientation)-1) {
+      m[2] += (grid_.horizontalSpacing_) / 2;
+    }
     break;
 
   case LayoutDirection::BottomToTop:
-    m[2] += (grid_.horizontalSpacing_ + 1) / 2;
-    m[0] += (grid_.horizontalSpacing_) / 2;
+    if (index != 0) {
+      m[2] += (grid_.horizontalSpacing_ + 1) / 2;
+    }
+    if (index != count(orientation)-1) {
+      m[0] += (grid_.horizontalSpacing_) / 2;
+    }
     break;
   }
 

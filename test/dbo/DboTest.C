@@ -109,8 +109,7 @@ namespace Wt {
   namespace Dbo {
 
     template <class Action>
-    void field(Action& action, Coordinate& coordinate, const std::string& name,
-               int size = -1)
+    void field(Action& action, Coordinate& coordinate, const std::string& name, WT_MAYBE_UNUSED int size = -1)
     {
       field(action, coordinate.x, name + "_x", 1000);
       field(action, coordinate.y, name + "_y", 1000);
@@ -124,7 +123,7 @@ namespace Wt {
         return sql_value_traits<std::string>::type(conn, size);
       }
 
-      static void bind(Pet p, SqlStatement *statement, int column, int size)
+      static void bind(Pet p, SqlStatement *statement, int column, WT_MAYBE_UNUSED int size)
       {
         statement->bind(column, petToString(p));
       }
@@ -906,6 +905,7 @@ BOOST_AUTO_TEST_CASE( dbo_test4 )
     session_->add(a2);
     session_->add(b);
 
+#if !defined(FIREBIRD) && !defined(MYSQL) && !defined(MSSQLSERVER)
     typedef std::tuple<dbo::ptr<B>, dbo::ptr<A>> BA;
     typedef dbo::collection<BA> BAs;
 
@@ -922,7 +922,6 @@ BOOST_AUTO_TEST_CASE( dbo_test4 )
     //
     // Firebird, MySQL and SQL Server are not able to execute this query.
 
-#if !defined(FIREBIRD) && !defined(MYSQL) && !defined(MSSQLSERVER)
     dbo::Query<BA> q = session_->query<BA>
       ("select B, A "
        "from " SCHEMA "\"table_b\" B join " SCHEMA "\"table_a\" A on A.\"b_id\" = B.\"id\"")
@@ -1026,11 +1025,11 @@ BOOST_AUTO_TEST_CASE( dbo_test4b )
   {
     dbo::Transaction t(*session_);
 
+#if !defined(FIREBIRD) && !defined(MYSQL)
     typedef std::tuple<dbo::ptr<A>, dbo::ptr<B>, dbo::ptr<C>> ABC;
     typedef dbo::collection<ABC> C_ABCs;
     typedef std::vector<ABC> ABCs;
 
-#if !defined(FIREBIRD) && !defined(MYSQL)
     dbo::Query<ABC> q = session_->query<ABC>
       ("select A, B, C " 
        "from " SCHEMA "\"table_a\" A join " SCHEMA "\"table_b\" B on (A.\"b_id\" = B.\"id\") join " SCHEMA "\"table_c\" C on (C.\"b2_id\" = B.\"id\")")
@@ -1145,11 +1144,11 @@ BOOST_AUTO_TEST_CASE( dbo_test4c )
   {
     dbo::Transaction t(*session_);
 
+#if !defined(FIREBIRD) && !defined(MYSQL)
     typedef std::tuple<dbo::ptr<A>, dbo::ptr<B>, dbo::ptr<C>> ABC;
     typedef dbo::collection<ABC> C_ABCs;
     typedef std::vector<ABC> ABCs;
 
-#if !defined(FIREBIRD) && !defined(MYSQL)
     dbo::Query<ABC> q = session_->query<ABC>
       ("select A, B, C "
        "from " SCHEMA "\"table_a\" A "
@@ -3614,13 +3613,15 @@ BOOST_AUTO_TEST_CASE( dbo_precision_test )
   // Test data originates from:
   // https://raw.githubusercontent.com/postgres/postgres/REL_12_9/src/test/regress/sql/float4.sql
   // This is distributed under: https://raw.githubusercontent.com/postgres/postgres/REL_12_9/COPYRIGHT
-    DboFixture f;
+  DboFixture f;
+#ifdef POSTGRES
   float quiet_nan = std::nanf("");
   static const uint32_t quiet_nan_hex = *(reinterpret_cast<uint32_t*>(&quiet_nan));
   float positive_infinity = std::numeric_limits<float>::infinity();
   static const uint32_t positive_infinity_hex = *(reinterpret_cast<uint32_t*>(&positive_infinity));
   float negative_infinity = -std::numeric_limits<float>::infinity();
   static const uint32_t negative_infinity_hex = *(reinterpret_cast<uint32_t*>(&negative_infinity));
+#endif
   static const uint32_t hex_values[] {
     // some special values
 #ifdef POSTGRES
@@ -3799,7 +3800,7 @@ BOOST_AUTO_TEST_CASE( dbo_precision_test )
     0x3f9e0651,
     0x03d20cfe
   };
-  for (int i = 0; i < sizeof hex_values / sizeof hex_values[0]; ++i) {
+  for (int i = 0; i < static_cast<int>(sizeof hex_values / sizeof hex_values[0]); ++i) {
     auto hex_value = hex_values[i];
     float fl = *(reinterpret_cast<float*>(&hex_value));
     char buf[100];
@@ -3860,12 +3861,14 @@ BOOST_AUTO_TEST_CASE( dbo_precision_test2 )
   // https://raw.githubusercontent.com/postgres/postgres/REL_12_9/src/test/regress/sql/float8.sql
   // See license: https://raw.githubusercontent.com/postgres/postgres/REL_12_9/COPYRIGHT
   DboFixture f;
+#ifdef POSTGRES
   double quiet_nan = std::nan("");
   static const uint64_t quiet_nan_hex = *(reinterpret_cast<uint64_t*>(&quiet_nan));
   double positive_infinity = std::numeric_limits<double>::infinity();
   static const uint64_t positive_infinity_hex = *(reinterpret_cast<uint64_t*>(&positive_infinity));
   double negative_infinity = -std::numeric_limits<double>::infinity();
   static const uint64_t negative_infinity_hex = *(reinterpret_cast<uint64_t*>(&negative_infinity));
+#endif
   static const uint64_t hex_values[] {
     // some special values
 #ifdef POSTGRES
@@ -4024,7 +4027,7 @@ BOOST_AUTO_TEST_CASE( dbo_precision_test2 )
     0x133fffffffffffff,
     0x3a6fa7161a4d6e0c
   };
-  for (int i = 0; i < sizeof hex_values / sizeof hex_values[0]; ++i) {
+  for (int i = 0; i < static_cast<int>(sizeof hex_values / sizeof hex_values[0]); ++i) {
     auto hex_value = hex_values[i];
     double dbl = *(reinterpret_cast<double*>(&hex_value));
     char buf[100];

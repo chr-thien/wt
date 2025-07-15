@@ -42,9 +42,9 @@ void Session::configureAuth()
   myAuthService.setAuthTokensEnabled(true, "logincookie");
 
   auto verifier = std::make_unique<Auth::PasswordVerifier>();
-  verifier->addHashFunction(std::make_unique<Auth::BCryptHashFunction>(7));
+  verifier->addHashFunction(std::make_unique<Auth::BCryptHashFunction>(12));
   myPasswordService.setVerifier(std::move(verifier));
-  myPasswordService.setAttemptThrottlingEnabled(true);
+  myPasswordService.setPasswordThrottle(std::make_unique<Wt::Auth::AuthThrottle>());
 
   auto validator
     = std::make_unique<Auth::PasswordStrengthValidator>();

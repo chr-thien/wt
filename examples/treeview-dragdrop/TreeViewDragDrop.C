@@ -388,9 +388,11 @@ private:
      * Note that disabling the context menu and catching the
      * right-click does not work reliably on all browsers.
      */
-    treeView->setAttributeValue
-      ("oncontextmenu",
-       "event.cancelBubble = true; event.returnValue = false; return false;");
+    // All event handlers ought to be JS, not DOM: #13501
+    WStringStream contextJS;
+    contextJS << WT_CLASS << ".$('" << treeView->id() << "').oncontextmenu = "
+              << "function() { event.cancelBubble = true; event.returnValue = false; return false; };";
+    Wt::WApplication::instance()->doJavaScript(contextJS.str());
     treeView->setModel(folderModel_);
     treeView->resize(200, WLength::Auto);
     treeView->setSelectionMode(SelectionMode::Single);
@@ -650,7 +652,7 @@ private:
     level1->appendRow(createFolderItem("Advisors", "ny-advisors"));
     folderModel_->appendRow(std::move(level1));
 
-    level1 = createFolderItem(WString(reinterpret_cast<const char*>(u8"Frankf\u00DCrt")));
+    level1 = createFolderItem(WString(reinterpret_cast<const char*>(u8"Frankf\u00FCrt")));
     level1->appendRow(createFolderItem("Sales", "frank-sales"));
     folderModel_->appendRow(std::move(level1));
 

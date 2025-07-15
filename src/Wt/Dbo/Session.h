@@ -73,6 +73,7 @@ namespace Wt {
         virtual void load(Session& session, MetaDboBase *obj);
         virtual MetaDboBase *load(Session& session, SqlStatement *statement,
                                   int& column);
+        virtual void releaseMemory();
 
         std::string primaryKeys() const;
       };
@@ -506,6 +507,37 @@ public:
    */
   void setFlushMode(FlushMode mode) { flush(); flushMode_ = mode; }
 
+  /*! \brief Enables or disables nested transactions
+   * 
+   * This enables or disables nested transactions. If nested transactions
+   * are disabled, creating a nested transaction will throw an Exception.
+   * 
+   * By default nested transactions are enabled.
+   * 
+   * \note Nested transactions can result in unexpected behavior due to
+   *       their side-effects. Generally, a transaction is scoped in a
+   *       certain way, and anything that changes the database in that
+   *       scope is persisted to the database once the scope ends. If
+   *       one transaction is nested in another, this may cause some
+   *       objects from the wrapped transaction's scope to be persisted,
+   *       after they are expected to. This is because when the wrapped
+   *       (or nested) transaction's scope ends, and its destructor is
+   *       called, it does not commit its changes to the database. Only
+   *       when all open transactions are closed, will the whole set
+   *       of changes be persisted. Sometimes this is harmless, but
+   *       sometimes this may result in unexpected behavior. A good
+   *       example being a nested transaction that causes an Exception.
+   *       In this case, both transactions are rolled back, and this
+   *       will touch objects from the wrapping transaction's scope.
+   */
+  void setAllowNestedTransaction(bool enable);
+
+  /*! \brief Returns whether nested transaction are enabled
+   * 
+   * \sa setAllowNestedTransaction()
+   */
+  bool nestedTransaction() const { return allowNestedTransaction_; };
+
 private:
   mutable std::string longlongType_;
   mutable std::string intType_;
@@ -543,6 +575,7 @@ private:
     virtual void load(Session& session, MetaDboBase *obj) override;
     virtual MetaDbo<C> *load(Session& session, SqlStatement *statement,
                              int& column) override;
+    virtual void releaseMemory() override;
   };
 
   typedef const std::type_info * const_typeinfo_ptr;
@@ -566,6 +599,8 @@ private:
   SqlConnectionPool *connectionPool_;
   Transaction::Impl *transaction_;
   FlushMode flushMode_;
+  bool mustDiscardChange_;
+  bool allowNestedTransaction_;
 
   void initSchema() const;
   void resolveJoinIds(Impl::MappingInfo *mapping);
@@ -613,6 +648,7 @@ private:
                        std::ostream *sout);
 
   void needsFlush(MetaDboBase *dbo);
+  bool mustDiscardChange() const { return mustDiscardChange_; }
 
   template <class C> Mapping<C> *getMapping() const;
   Impl::MappingInfo *getMapping(const char *tableName) const;

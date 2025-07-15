@@ -156,10 +156,13 @@ public:
    *
    * The scope represents how much protected information the web
    * application wants to access, and in what way.
+   * 
+   * By default, this is the scope given at the creation of the process
+   * but this can be changed by overriding this function.
    *
    * \sa OAuthService::createProcess(), OAuthService::authenticationScope()
    */
-  const std::string& scope() const { return scope_; }
+  virtual const std::string& scope() const { return scope_; }
 
   /*! \brief Returns the %OAuth service which spawned this process.
    *
@@ -317,6 +320,20 @@ protected:
    * error, before emitting authenticated() with an invalid Identity.
    */
   virtual void setError(const WString& e);
+
+  /*! \brief Return the authorization endpoint URL.
+   * 
+   * This is a remote URL which hosts the %OAuth authorization user
+   * interface. This URL is loaded in the popup window at the start of
+   * the authorization process.
+   * 
+   * By default, this is the authorization endpoint URL configured in
+   * the OAuthService of this process, but this can be changed by
+   * overriding this function.
+   * 
+   * \sa OAuthService::authorizationEndpoint() 
+   */
+  virtual std::string authorizationEndpoint() const;
 
 private:
   const OAuthService& service_;

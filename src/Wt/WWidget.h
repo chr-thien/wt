@@ -201,7 +201,7 @@ public:
    * widget following CSS rules.
    *
    * When the widget is not managed by a layout manager, the automatic
-   * (natural) size of a widget depends on whether they widget is a
+   * (natural) size of a widget depends on whether the widget is a
    * <i>block</i> or <i>inline</i> widget:
    * - a <i>block</i> widget takes by default the width of the parent, and the height
    *   that it needs based on its contents
@@ -370,11 +370,24 @@ public:
    * case there is not enough room to the right). It is aligned so
    * that the top edges align (or the bottom edges if there is not
    * enough room below).
+   * 
+   * \p adjustOrientations allows to specify the axes on which the
+   * widget can adjust it's position if there is not enough room next
+   * to the other widget, breaking the previous rules if necessary. For
+   * example, if Orientation::Vertical flag of \p adjustOrientations is
+   * set, and part of the widget would be cut off by the top of the
+   * window, the widget would be move downward until the top of the
+   * widget is fully visible (or the widget reaches the bottom of the
+   * window). In that case, the widget would not be aligned with the
+   * other widget, in case \p orientation = Wt::Orientation::Horizontal,
+   * or would be displayed over the other widget, in case \p orientation
+   * = Wt::Orientation::Vertical.
    *
    * \note This only works if JavaScript is available.
    */
   virtual void positionAt(const WWidget *widget,
-                          Orientation orientation = Orientation::Vertical);
+                          Orientation orientation = Orientation::Vertical,
+                          WFlags<Orientation> adjustOrientations = AllOrientations);
 
   /*! \brief Sets the CSS line height for contained text.
    */
@@ -517,11 +530,19 @@ public:
 
   /*! \brief Sets whether the widget is disabled.
    *
-   * Enables or disables the widget (including all its descendant
-   * widgets). setDisabled(false) will enable this widget and all
-   * descendant widgets that are not disabled. A widget is only
-   * enabled if it and all its ancestors in the widget tree are
-   * disabled.
+   * The widget can be set to being disabled, or enabled. This state
+   * will also be propagated to all its descendants. Those descendants
+   * will only be "visually" made disabled, their actual isDisabled()
+   * state will remain unaltered. All descendants will be assigned the
+   * disabled styleclass, which is dependent on the used Theme.
+   *
+   * The isDisabled() check will thus only return \p true in case
+   * setDisabled(true) has been called on the widget before. If the
+   * anscestor of a widget has been marked setDisabled(true), the
+   * widget's isDisabled() state will remain \p false.
+   *
+   * To check if a widget has been passively disabled, by one of its
+   * anscestors, use isEnabled().
    *
    * Typically, a disabled form widget will not allow changing the
    * value, and disabled widgets will not react to mouse click events.
@@ -538,9 +559,9 @@ public:
 
   /*! \brief Returns whether the widget is set disabled.
    *
-   * A widget that is not set disabled may still be disabled when one
-   * of its ancestor widgets is set disabled. Use isEnabled() to find
-   * out whether a widget is enabled.
+   * This method will return \p true if, and only if, it has been marked
+   * setDisabled(true) explicitly. It can still inherit the disabled
+   * state from one of its anscestors.
    *
    * \sa setDisabled(), isEnabled()
    */

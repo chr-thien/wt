@@ -9,15 +9,14 @@
 #include "Wt/Auth/AuthService.h"
 #include "Wt/Auth/Login.h"
 #include "Wt/Auth/AuthModel.h"
+#include "Wt/Auth/HashFunction.h"
+
+#include "Wt/Http/Cookie.h"
 
 #include "Wt/WApplication.h"
 #include "Wt/WEnvironment.h"
 #include "Wt/WInteractWidget.h"
 #include "Wt/WLogger.h"
-
-#ifndef WT_DEBUG_JS
-#include "js/AuthModel.min.js"
-#endif
 
 #include "Wt/WDllDefs.h"
 
@@ -72,26 +71,14 @@ bool AuthModel::isVisible(Field field) const
 void AuthModel::configureThrottling(WInteractWidget *button)
 {
   if (passwordAuth() && passwordAuth()->attemptThrottlingEnabled()) {
-    WApplication *app = WApplication::instance();
-    LOAD_JAVASCRIPT(app, "js/AuthModel.js", "AuthThrottle", wtjs1);
-
-    button->setJavaScriptMember(" AuthThrottle",
-                                "new " WT_CLASS ".AuthThrottle(" WT_CLASS ","
-                                + button->jsRef() + ","
-                                + WString::tr("Wt.Auth.throttle-retry")
-                                .jsStringLiteral()
-                                + ");");
+    passwordAuth()->passwordThrottle()->initializeThrottlingMessage(button);
   }
 }
 
 void AuthModel::updateThrottling(WInteractWidget *button)
 {
   if (passwordAuth() && passwordAuth()->attemptThrottlingEnabled()) {
-    WStringStream s;
-    s << button->jsRef() << ".wtThrottle.reset("
-      << throttlingDelay_ << ");";
-
-    button->doJavaScript(s.str());
+    passwordAuth()->passwordThrottle()->updateThrottlingMessage(button, throttlingDelay_);
   }
 }
 
@@ -134,8 +121,9 @@ bool AuthModel::validateField(Field field)
            WValidator::Result(ValidationState::Invalid,
                               WString::tr("Wt.Auth.password-invalid")));
 
-        if (passwordAuth()->attemptThrottlingEnabled())
+        if (passwordAuth()->attemptThrottlingEnabled()) {
           throttlingDelay_ = passwordAuth()->delayForNextAttempt(user);
+        }
 
         return false;
       case PasswordResult::LoginThrottling:
@@ -146,8 +134,6 @@ bool AuthModel::validateField(Field field)
         setValidated(PasswordField, false);
 
         throttlingDelay_ = passwordAuth()->delayForNextAttempt(user);
-        LOG_SECURE("throttling: " << throttlingDelay_
-                   << " seconds for " << user.identity(Identity::LoginName));
 
         return false;
       case PasswordResult::PasswordValid:
@@ -204,7 +190,19 @@ bool AuthModel::login(Login& login)
     User user = users().findWithIdentity(Identity::LoginName,
                                          valueText(LoginNameField));
     cpp17::any v = value(RememberMeField);
-    if (loginUser(login, user)) {
+    LoginState state = LoginState::Strong;
+    // Either MFA is enabled and required, or it is enabled and the user
+    // has a secret key attached to it.
+    WString totpSecretKey;
+    if (user.isValid()) {
+      totpSecretKey = user.identity(baseAuth()->mfaProvider());
+    }
+
+    if (hasMfaStep(user)) {
+      state = LoginState::RequiresMfa;
+    }
+
+    if (loginUser(login, user, state)) {
       reset();
 
       if (cpp17::any_has_value(v) && cpp17::any_cast<bool>(v) == true)
@@ -222,12 +220,30 @@ void AuthModel::logout(Login& login)
   if (login.loggedIn()) {
     if (baseAuth()->authTokensEnabled()) {
       WApplication *app = WApplication::instance();
-      app->removeCookie(baseAuth()->authTokenCookieName());
 
-      /*
-       * FIXME: it would be nice if we also delete the relevant token
-       * from the database!
-       */
+      // Retrieve current cookie, if it is present.
+      // This retrieves it from the environment. Which is only constructed once, and does NOT update.
+      const std::string* token = app->environment().getCookie(baseAuth()->authTokenCookieName());
+      // Ensure cookies added by the application during its lifetime are also scanned.
+      const std::string* addedToken = app->findAddedCookies(baseAuth()->authTokenCookieName());
+
+      std::unique_ptr<AbstractUserDatabase::Transaction> t(users().startTransaction());
+      if (token) {
+        std::string hash = baseAuth()->tokenHashFunction()->compute(*token, std::string());
+        users().removeAuthToken(login.user(), hash);
+      }
+
+      if (addedToken) {
+        std::string hash = baseAuth()->tokenHashFunction()->compute(*addedToken, std::string());
+        users().removeAuthToken(login.user(), hash);
+      }
+
+      if (t.get()) {
+        t->commit();
+      }
+
+      // Mark the cookie to be removed
+      app->removeCookie(Http::Cookie(baseAuth()->authTokenCookieName()));
     }
 
     login.logout();
@@ -285,5 +301,20 @@ bool AuthModel::showResendEmailVerification() const
   return user.isValid() && user.email().empty();
 }
 
+bool AuthModel::hasMfaStep(const User& user) const
+{
+  WString totpSecretKey;
+  if (user.isValid()) {
+    totpSecretKey = user.identity(baseAuth()->mfaProvider());
+  }
+
+  if (baseAuth()->mfaEnabled() && !baseAuth()->mfaRequired() &&totpSecretKey.empty()) {
+    LOG_WARN("hasMfaStep(): MFA is enabled (but not required), and no valid identity was found. The MFA step is skipped for user: " << user.id());
+  }
+
+  return ((baseAuth()->mfaEnabled() && !totpSecretKey.empty())
+          || (baseAuth()->mfaEnabled() && baseAuth()->mfaRequired()));
+
+}
   }
 }

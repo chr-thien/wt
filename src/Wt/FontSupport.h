@@ -214,6 +214,8 @@ public:
 private:
   WPaintDevice *device_;
 
+  static const std::size_t FONT_CACHE_MAX_SIZE = 10;
+
 #ifdef WT_FONTSUPPORT_SIMPLE
 
   struct FontCollection {
@@ -231,7 +233,11 @@ private:
   };
 
   typedef std::list<Matched> MatchCache;
-  mutable MatchCache cache_;
+  // The cache that tracks the used fonts, and limits the size of the used
+  // fonts to a maximum of 10 fonts.
+  // This cache keeps the fonts alive for as long as the cache lives, or
+  // when a new match would exceed the current cache's limit.
+  mutable MatchCache lruCache_;
 
   const WFont *font_;
 
@@ -251,21 +257,52 @@ private:
 
 #ifdef WT_FONTSUPPORT_PANGO
 
-  PangoContext *context_;
-  PangoFont *currentFont_;
+  struct PangoContextDeleter {
+    void operator()(PangoContext* context)
+    {
+      g_object_unref(context);
+    }
+  };
+
+  struct PangoFontDeleter {
+    void operator()(PangoFont* font)
+    {
+      g_object_unref(font);
+    }
+  };
+
+  struct PangoFontDescriptionDeleter {
+    void operator()(PangoFontDescription* fontDescription)
+    {
+      pango_font_description_free(fontDescription);
+    }
+  };
+
+  // Context for Pango for each font support call
+  std::unique_ptr<PangoContext, PangoContextDeleter> context_;
+  // Raw pointer to currently used font.
+  PangoFont* currentFont_;
   EnabledFontFormats enabledFontFormats_;
 
+  /* Singular instance of a match, containing the Pango font and its
+   * description. This struct manages the lifetime of the font and
+   * description.
+   */
   struct Matched {
     WFont font;
-    PangoFont *match;
-    PangoFontDescription *desc;
+    std::unique_ptr<PangoFont, PangoFontDeleter> match;
+    std::unique_ptr<PangoFontDescription, PangoFontDescriptionDeleter> desc;
 
     Matched() : font(), match(nullptr), desc(nullptr) { }
-    Matched(const WFont& f, PangoFont *m, PangoFontDescription *d) : font(f), match(m), desc(d) { }
+    Matched(const WFont& f, std::unique_ptr<PangoFont, PangoFontDeleter> m, std::unique_ptr<PangoFontDescription, PangoFontDescriptionDeleter> d) : font(f), match(std::move(m)), desc(std::move(d)) { }
   };
 
   typedef std::list<Matched> MatchCache;
-  mutable MatchCache cache_;
+  // The cache that tracks the used fonts, and limits the size of the used
+  // fonts to a maximum of 10 fonts.
+  // This cache keeps the fonts and descriptions alive for as long as it
+  // lives, or when a new match would exceed the current cache's limit.
+  mutable MatchCache lruCache_;
 
   PangoFontDescription *createFontDescription(const WFont& f) const;
   static std::string fontPath(PangoFont *font);
@@ -299,7 +336,11 @@ private:
   };
 
   typedef std::list<Matched> MatchCache;
-  mutable MatchCache cache_;
+  // The cache that tracks the used fonts, and limits the size of the used
+  // fonts to a maximum of 10 fonts.
+  // This cache keeps the fonts alive for as long as the cache lives, or
+  // when a new match would exceed the current cache's limit.
+  mutable MatchCache lruCache_;
 
   struct TextFragment {
     TextFragment(std::string fontPath,

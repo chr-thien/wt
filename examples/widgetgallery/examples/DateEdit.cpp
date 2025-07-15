@@ -53,5 +53,8 @@ button->clicked().connect([=] {
     }
 });
 
+// Native variant shouldn't have formatting info
+form->setCondition("if:is-not-native", true);
+
 SAMPLE_END(return std::move(form))
 

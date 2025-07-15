@@ -68,7 +68,7 @@ void Session::configureAuth()
   myAuthService.setEmailVerificationEnabled(true);
 
   auto verifier = std::make_unique<Auth::PasswordVerifier>();
-  verifier->addHashFunction(std::make_unique<Auth::BCryptHashFunction>(7));
+  verifier->addHashFunction(std::make_unique<Auth::BCryptHashFunction>(12));
 
 #ifdef HAVE_CRYPT
   // We want to still support users registered in the pre - Wt::Auth
@@ -78,7 +78,7 @@ void Session::configureAuth()
 
   myPasswordService.setVerifier(std::move(verifier));
   myPasswordService.setStrengthValidator(std::make_unique<Auth::PasswordStrengthValidator>());
-  myPasswordService.setAttemptThrottlingEnabled(true);
+  myPasswordService.setPasswordThrottle(std::make_unique<Wt::Auth::AuthThrottle>());
 
   if (Auth::GoogleService::configured()) {
     myOAuthServices.push_back(std::make_unique<Auth::GoogleService>(myAuthService));

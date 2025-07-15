@@ -22,7 +22,7 @@ namespace Wt {
 const char *WWidget::WT_RESIZE_JS = "wtResize";
 const char *WWidget::WT_GETPS_JS = "wtGetPS";
 
-LOGGER("WWidget");
+WT_MAYBE_UNUSED LOGGER("WWidget");
 
 WWidget::WWidget()
   : parent_(nullptr)
@@ -45,7 +45,7 @@ WWidget::~WWidget()
   renderOk();
 }
 
-std::unique_ptr<WWidget> WWidget::removeWidget(WWidget *widget)
+std::unique_ptr<WWidget> WWidget::removeWidget(WT_MAYBE_UNUSED WWidget* widget)
 {
   throw std::logic_error("WWidget::removeWidget() ought not to be called");
 }
@@ -67,7 +67,7 @@ std::unique_ptr<WWidget> WWidget::removeFromParent()
 void WWidget::refresh()
 { }
 
-void WWidget::resize(const WLength& width, const WLength& height)
+void WWidget::resize(WT_MAYBE_UNUSED const WLength& width, const WLength& height)
 {
   setJsSize();
 }
@@ -93,7 +93,7 @@ void WWidget::setJsSize()
        + "false");
 }
 
-void WWidget::render(WFlags<RenderFlag> flags)
+void WWidget::render(WT_MAYBE_UNUSED WFlags<RenderFlag> flags)
 { }
 
 bool WWidget::isRendered() const
@@ -149,7 +149,7 @@ void WWidget::scheduleRerender(bool laterOnly, WFlags<RepaintFlag> flags)
   }
 }
 
-void WWidget::childResized(WWidget *child, WFlags<Orientation> directions)
+void WWidget::childResized(WT_MAYBE_UNUSED WWidget* child, WFlags<Orientation> directions)
 {
   /*
    * Stop propagation at an absolutely positioned widget
@@ -355,7 +355,7 @@ void WWidget::getDropTouch(const std::string sourceId, const std::string mimeTyp
   dropEvent(e);
 }
 
-void WWidget::dropEvent(WDropEvent event)
+void WWidget::dropEvent(WT_MAYBE_UNUSED WDropEvent event)
 { }
 
 DomElement *WWidget::createSDomElement(WApplication *app)
@@ -405,28 +405,35 @@ EventSignalBase *WWidget::getEventSignal(const char *name)
   return nullptr;
 }
 
-int WWidget::boxPadding(Orientation orientation) const
+int WWidget::boxPadding(WT_MAYBE_UNUSED Orientation orientation) const
 {
   return 0;
 }
 
-int WWidget::boxBorder(Orientation orientation) const
+int WWidget::boxBorder(WT_MAYBE_UNUSED Orientation orientation) const
 {
   return 0;
 }
 
-void WWidget::positionAt(const WWidget *widget, Orientation orientation)
+void WWidget::positionAt(const WWidget *widget, Orientation orientation,
+                         WFlags<Orientation> adjustOrientations)
 {
   if (isHidden())
     show();
 
   std::string side = (orientation == Orientation::Horizontal
                       ? ".Horizontal" : ".Vertical");
+  
+  std::string canAdjustX = adjustOrientations.test(Orientation::Horizontal) ? "true" : "false";
+  std::string canAdjustY = adjustOrientations.test(Orientation::Vertical) ? "true" : "false";
 
   doJavaScript(WT_CLASS ".positionAtWidget('"
                + id() + "','"
                + widget->id() + "',"
-               WT_CLASS + side + ");");
+               WT_CLASS + side + ","
+               + "false,"
+               + canAdjustX + ","
+               + canAdjustY + ");");
 }
 
 void WWidget::setLayoutSizeAware(bool aware)
@@ -458,7 +465,7 @@ bool WWidget::layoutSizeAware() const
   return flags_.test(BIT_RESIZE_AWARE);
 }
 
-void WWidget::layoutSizeChanged(int width, int height)
+void WWidget::layoutSizeChanged(WT_MAYBE_UNUSED int width, int height)
 { }
 
 bool WWidget::isInLayout() const

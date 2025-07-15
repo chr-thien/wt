@@ -35,6 +35,8 @@ void FormWidgets::populateSubMenu(Wt::WMenu *menu)
                 deferCreate([this]{ return autoComplete(); }));
   menu->addItem("Date & Time entry",
                 deferCreate([this]{ return dateEntry(); }));
+  menu->addItem("Password",
+                deferCreate([this]{ return passwordEdit(); }));
   menu->addItem("In-place edit",
                 deferCreate([this]{ return inPlaceEdit(); }));
   menu->addItem("Slider",
@@ -177,7 +179,9 @@ std::unique_ptr<Wt::WWidget> FormWidgets::autoComplete()
 #include "examples/CalendarSimple.cpp"
 #include "examples/CalendarExtended.cpp"
 #include "examples/DateEdit.cpp"
+#include "examples/DateEditNative.cpp"
 #include "examples/TimeEdit.cpp"
+#include "examples/TimeEditNative.cpp"
 
 std::unique_ptr<Wt::WWidget> FormWidgets::dateEntry()
 {
@@ -185,7 +189,24 @@ std::unique_ptr<Wt::WWidget> FormWidgets::dateEntry()
   result->bindWidget("CalendarSimple", CalendarSimple());
   result->bindWidget("CalendarExtended", CalendarExtended());
   result->bindWidget("DateEdit", DateEdit());
+  result->bindWidget("DateEditNative", DateEditNative());
   result->bindWidget("TimeEdit", TimeEdit());
+  result->bindWidget("TimeEditNative", TimeEditNative());
+
+  return std::move(result);
+}
+
+
+#include "examples/PasswordEditDefault.cpp"
+#include "examples/PasswordEditAutocomplete.cpp"
+#include "examples/PasswordEditNative.cpp"
+
+std::unique_ptr<Wt::WWidget> FormWidgets::passwordEdit()
+{
+  auto result = std::make_unique<TopicTemplate>("forms-passwordEdit");
+  result->bindWidget("PasswordEditDefault", PasswordEditDefault());
+  result->bindWidget("PasswordEditAutocomplete", PasswordEditAutocomplete());
+  result->bindWidget("PasswordEditNative", PasswordEditNative());
 
   return std::move(result);
 }
@@ -207,6 +228,7 @@ std::unique_ptr<Wt::WWidget> FormWidgets::inPlaceEdit()
 #include "examples/Slider.cpp"
 #include "examples/SliderVertical.cpp"
 #include "examples/SliderSteps.cpp"
+#include "examples/SliderNative.cpp"
 
 std::unique_ptr<Wt::WWidget> FormWidgets::slider()
 {
@@ -214,6 +236,7 @@ std::unique_ptr<Wt::WWidget> FormWidgets::slider()
   result->bindWidget("Slider", Slider());
   result->bindWidget("SliderVertical", SliderVertical());
   result->bindWidget("SliderSteps", SliderSteps());
+  result->bindWidget("SliderNative", SliderNative());
 
   return std::move(result);
 }

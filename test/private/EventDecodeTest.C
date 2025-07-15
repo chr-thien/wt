@@ -15,7 +15,12 @@
 
 class MockRequest : public Wt::WebRequest {
 public:
-  virtual void flush(ResponseState state, const WriteCallback &callback) override
+  bool supportsTransferWebSocketResourceSocket() override
+  {
+    return false;
+  }
+
+  virtual void flush(WT_MAYBE_UNUSED ResponseState state, WT_MAYBE_UNUSED const WriteCallback& callback) override
   { }
 
   virtual std::istream &in() override
@@ -33,11 +38,16 @@ public:
     return err_;
   }
 
-  virtual void setRedirect(const std::string &url) override
+  virtual void setRedirect(WT_MAYBE_UNUSED const std::string& url) override
   { }
 
-  virtual void setStatus(int status) override
+  virtual void setStatus(WT_MAYBE_UNUSED int status) override
   { }
+
+  int status() override
+  {
+    return 0;
+  }
 
   virtual void setContentType(const std::string &value) override
   {
@@ -59,10 +69,13 @@ public:
     return contentLength_;
   }
 
-  virtual void addHeader(const std::string &name, const std::string &value) override
+  virtual void addHeader(WT_MAYBE_UNUSED const std::string& name, WT_MAYBE_UNUSED const std::string& value) override
   { }
 
-  virtual const char *envValue(const char *name) const override
+  void insertHeader(WT_MAYBE_UNUSED const std::string &name, WT_MAYBE_UNUSED const std::string &value) override
+  { }
+
+  virtual const char *envValue(WT_MAYBE_UNUSED const char *name) const override
   {
     return nullptr;
   }
@@ -107,7 +120,7 @@ public:
     return urlScheme_.c_str();
   }
 
-  virtual const char *headerValue(const char *name) const override
+  virtual const char *headerValue(WT_MAYBE_UNUSED const char* name) const override
   {
     return nullptr;
   }

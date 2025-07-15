@@ -21,7 +21,7 @@
 
 namespace Wt {
 
-LOGGER("WWidgetItem");
+WT_MAYBE_UNUSED LOGGER("WWidgetItem");
 
 StdWidgetItemImpl::StdWidgetItemImpl(WWidgetItem *item)
   : item_(item)
@@ -78,13 +78,30 @@ int StdWidgetItemImpl::minimumHeight() const
     return static_cast<int>(item_->widget()->minimumHeight().toPixels());
 }
 
+int StdWidgetItemImpl::maximumWidth() const
+{
+  if (item_->widget()->isHidden())
+    return 0;
+  else
+    return static_cast<int>(item_->widget()->maximumWidth().toPixels());
+}
+
+int StdWidgetItemImpl::maximumHeight() const
+{
+  if (item_->widget()->isHidden())
+    return 0;
+  else
+    return static_cast<int>(item_->widget()->maximumHeight().toPixels());
+}
+
 const std::string StdWidgetItemImpl::id() const
 {
   return item_->widget()->id();
 }
 
-DomElement *StdWidgetItemImpl::createDomElement(DomElement *parent,
-                                                bool fitWidth, bool fitHeight,
+DomElement *StdWidgetItemImpl::createDomElement(WT_MAYBE_UNUSED DomElement* parent,
+                                                WT_MAYBE_UNUSED bool fitWidth,
+                                                WT_MAYBE_UNUSED bool fitHeight,
                                                 WApplication *app)
 {
   WWidget *w = item_->widget();

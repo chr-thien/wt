@@ -46,8 +46,9 @@ SessionProcess::SessionProcess(SessionProcessManager *manager) noexcept
 
 void SessionProcess::requestStop() noexcept
 {
-  io_service_.post(strand_.wrap(
-          std::bind(&SessionProcess::stop, shared_from_this())));
+  asio::post(io_service_,
+             strand_.wrap(
+                std::bind(&SessionProcess::stop, shared_from_this())));
 }
 
 void SessionProcess::closeClientSocket() noexcept
@@ -55,6 +56,7 @@ void SessionProcess::closeClientSocket() noexcept
   Wt::AsioWrapper::error_code ignored_ec;
   if (socket_) {
     socket_->shutdown(asio::ip::tcp::socket::shutdown_both, ignored_ec);
+    socket_->cancel(ignored_ec);
     socket_->close(ignored_ec);
     socket_ = nullptr;
   }
@@ -91,11 +93,7 @@ void SessionProcess::asyncExec(const Configuration &config,
   if (!ec)
     acceptor_->listen(0, ec);
 #ifndef WT_WIN32
-#if (defined(WT_ASIO_IS_BOOST_ASIO) && BOOST_VERSION >= 106600) || (defined(WT_ASIO_IS_STANDALONE_ASIO) && ASIO_VERSION >= 101100)
   fcntl(acceptor_->native_handle(), F_SETFD, FD_CLOEXEC);
-#else
-  fcntl(acceptor_->native(), F_SETFD, FD_CLOEXEC);
-#endif
 #endif // !WT_WIN32
   if (ec) {
     LOG_ERROR("Couldn't create listening socket: " << ec.message());
@@ -124,10 +122,16 @@ void SessionProcess::acceptHandler(const Wt::AsioWrapper::error_code& err,
 
 void SessionProcess::read() noexcept
 {
+  // #13567: Ensure for very quick processes they aren't closed before
+  // scheduling the read operation.
+  if (!socket_) {
+    return;
+  }
+
   asio::async_read_until
     (*socket_, buf_, '\n',
-     strand_.wrap(
-       std::bind(&SessionProcess::readHandler, shared_from_this(), std::placeholders::_1)));
+      strand_.wrap(
+        std::bind(&SessionProcess::readHandler, shared_from_this(), std::placeholders::_1)));
 }
 
 void SessionProcess::readHandler(const Wt::AsioWrapper::error_code& err) noexcept

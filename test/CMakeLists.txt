@@ -4,6 +4,7 @@ IF(ENABLE_LIBWTTEST)
     any/AnyTest.C
     auth/BCryptTest.C
     auth/SHA1Test.C
+    auth/TotpTest.C
     configuration/EntryPointTest.C
     core/BindTest.C
     core/ObservingPtrTest.C
@@ -14,6 +15,7 @@ IF(ENABLE_LIBWTTEST)
     http/CookieTest.C
     http/HttpClientTest.C
     formdelegate/WFormDelegate.C
+    logger/ConcurentLoggingTest.C
     mail/MailClientTest.C
     mail/MailMessageTest.C
     matrix/MatrixTest.C
@@ -39,6 +41,7 @@ IF(ENABLE_LIBWTTEST)
     types/WDateTimeTest.C
     utf8/Utf8Test.C
     utf8/XmlTest.C
+    utils/Base32Test.C
     utils/Base64Test.C
     utils/DateUtils.C
     utils/EraseWord.C
@@ -48,12 +51,16 @@ IF(ENABLE_LIBWTTEST)
     utils/RoundJsString.C
     utils/XmlUtils.C
     validators/WEmailValidator.C
+    validators/WStackedValidator.C
+    widgets/DisabledTest.C
     widgets/WCompositeWidgetTest.C
     widgets/WContainerWidgetTest.C
     widgets/WDateEditTest.C
     widgets/WSpinBoxTest.C
     widgets/WStackedWidgetTest.C
+    widgets/WTemplateTest.C
     widgets/WTextTest.C
+    widgets/WTimeEditTest.C
     widgets/WTreeViewTest.C
     length/WLengthTest.C
     color/WColorTest.C
@@ -66,6 +73,23 @@ IF(ENABLE_LIBWTTEST)
     wdatetime/WDateTimeTest.C
     web/DomElementTest.C
   )
+
+  set(thirdpartysources
+    test.C
+    thirdparty/qrcodegen/QrCode.C
+  )
+
+  add_executable(thirdpartytest.wt ${thirdpartysources})
+  set_target_properties(thirdpartytest.wt PROPERTIES FOLDER "test/thirdparty")
+  target_link_libraries(thirdpartytest.wt PRIVATE wt wttest ${BOOST_TEST_LIBRARIES})
+
+  if(TARGET Boost::headers)
+    target_link_libraries(thirdpartytest.wt PRIVATE Boost::headers)
+  endif()
+
+  if(WT_WITH_SSL)
+    target_link_libraries(thirdpartytest.wt PRIVATE ${OPENSSL_LIBRARIES})
+  endif()
 
   IF (WT_HAS_WRASTERIMAGE)
      SET(TEST_SOURCES ${TEST_SOURCES}
@@ -114,6 +138,7 @@ IF(ENABLE_LIBWTTEST)
       dbo/JsonTest2.C
       dbo/AuthDboTest.C
       dbo/DboTestCompositeKey.C
+      auth/PasswordServiceTest.C
       private/DboImplTest.C
     )
 
@@ -209,13 +234,16 @@ IF(ENABLE_LIBWTTEST)
     )
 
     ADD_EXECUTABLE(test.http ${HTTP_TEST_SOURCES})
-    TARGET_LINK_LIBRARIES(test.http wt wthttp ${WT_THREAD_LIB} ${BOOST_TEST_LIBRARIES})
+    TARGET_LINK_LIBRARIES(test.http PRIVATE wt wthttp ${WT_THREAD_LIB} ${BOOST_TEST_LIBRARIES})
     IF(MSVC)
       SET_TARGET_PROPERTIES(test.http PROPERTIES FOLDER "test")
-    ENDIF(MSVC)  
+    ENDIF(MSVC)
     IF(TARGET Boost::headers)
-        TARGET_LINK_LIBRARIES(test.http Boost::headers)
+      TARGET_LINK_LIBRARIES(test.http PRIVATE Boost::headers)
     ENDIF()
+    if(WT_WITH_SSL)
+      target_link_libraries(test.http PRIVATE ${OPENSSL_LIBRARIES})
+    endif()
   ENDIF(CONNECTOR_HTTP)
 
 ELSE (ENABLE_LIBWTTEST)

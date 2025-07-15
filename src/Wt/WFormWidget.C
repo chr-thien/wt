@@ -144,8 +144,8 @@ void WFormWidget::render(WFlags<RenderFlag> flags)
     if (flags_.test(BIT_JS_OBJECT))
       defineJavaScript(true);
 
-    if (validator()) {
-      WValidator::Result result = validator()->validate(valueText());
+    if (realValidator()) {
+      WValidator::Result result = realValidator()->validate(valueText());
       WApplication::instance()->theme()
         ->applyValidationStyle(this, result,
                                ValidationStyleFlag::InvalidStyle);
@@ -192,6 +192,7 @@ void WFormWidget::enableAjax()
 
 void WFormWidget::validatorChanged()
 {
+  flags_.set(BIT_VALIDATOR_CHANGED);
   std::string validateJS = validator_->javaScriptValidate();
   if (!validateJS.empty()) {
     setJavaScriptMember("wtValidate", validateJS);
@@ -231,6 +232,11 @@ void WFormWidget::validatorChanged()
   }
 
   validate();
+}
+
+bool WFormWidget::hasValidatorChanged() const noexcept
+{
+  return flags_.test(BIT_VALIDATOR_CHANGED);
 }
 
 void WFormWidget::updateDom(DomElement& element, bool all)
@@ -286,6 +292,7 @@ void WFormWidget::propagateRenderOk(bool deep)
 {
   flags_.reset(BIT_ENABLED_CHANGED);
   flags_.reset(BIT_VALIDATION_CHANGED);
+  flags_.reset(BIT_VALIDATOR_CHANGED);
 
   WInteractWidget::propagateRenderOk(deep);
 }
@@ -342,6 +349,7 @@ void WFormWidget::setValidator(const std::shared_ptr<WValidator>& validator)
       WApplication::instance()->theme()
         ->applyValidationStyle(this, WValidator::Result(), None);
 
+    validationToolTip_ = WString();
     validateJs_.reset();
     filterInput_.reset();
   }
@@ -349,8 +357,8 @@ void WFormWidget::setValidator(const std::shared_ptr<WValidator>& validator)
 
 ValidationState WFormWidget::validate()
 {
-  if (validator()) {
-    WValidator::Result result = validator()->validate(valueText());
+  if (realValidator()) {
+    WValidator::Result result = realValidator()->validate(valueText());
 
     if (isRendered())
       WApplication::instance()->theme()

@@ -18,8 +18,13 @@ WT_DECLARE_WT_MEMBER(1, JavaScriptConstructor, "WFileDropWidget", function(APP, 
   let sending = false;
   let acceptDrops = true;
 
+  let acceptDirectories = false;
+  let acceptDirectoriesRecursive = false;
+
   let dropIndication = false;
   let bodyDropForward = false;
+
+  let filePickerType = "file-selection"; // default for an <input type="file">
 
   /** @type {?Worker} */
   let uploadWorker = null;
@@ -27,11 +32,29 @@ WT_DECLARE_WT_MEMBER(1, JavaScriptConstructor, "WFileDropWidget", function(APP, 
 
   let dragState = 0;
 
+  // input-tag used to redirect a click event on the drop-widget
   const hiddenInput = document.createElement("input");
   hiddenInput.type = "file";
   hiddenInput.setAttribute("multiple", "multiple");
   hiddenInput.style.display = "none";
+  dropwidget.hiddenInput = hiddenInput;
   dropwidget.appendChild(hiddenInput);
+
+  // input-tags that are used by the server to open file/dir-picker
+  // Note: these nodes are added to the body because otherwise they also trigger hiddenInput
+  const serverFileInput = document.createElement("input");
+  serverFileInput.type = "file";
+  serverFileInput.setAttribute("multiple", "multiple");
+  serverFileInput.style.display = "none";
+  window.document.body.appendChild(serverFileInput);
+  dropwidget.serverFileInput = serverFileInput;
+  const serverDirInput = document.createElement("input");
+  serverDirInput.type = "file";
+  serverDirInput.setAttribute("multiple", "multiple");
+  serverDirInput.setAttribute("webkitdirectory", "webkitdirectory");
+  serverDirInput.style.display = "none";
+  window.document.body.appendChild(serverDirInput);
+  dropwidget.serverDirInput = serverDirInput;
 
   const dropcover = document.createElement("div");
   dropcover.classList.add("Wt-dropcover");
@@ -48,19 +71,24 @@ WT_DECLARE_WT_MEMBER(1, JavaScriptConstructor, "WFileDropWidget", function(APP, 
     return hasFileItem || hasFilesType;
   }
 
-  this.validFileCheck = function(file, callback, url) {
+  this.validFileCheck = function(upload, callback, url) {
     const reader = new FileReader();
     reader.onload = function() {
-      callback(true, url);
+      callback(true, url, upload);
     };
     reader.onerror = function() {
-      callback(false, url);
+      callback(false, url, upload);
     };
-    reader.readAsText(file.slice(0, 32)); // try reading some bytes
+    reader.readAsText(upload.file.slice(0, 32)); // try reading some bytes
   };
 
   dropwidget.setAcceptDrops = function(enable) {
     acceptDrops = enable;
+  };
+
+  dropwidget.setAcceptDirectories = function(enable, recursive) {
+    acceptDirectories = enable;
+    acceptDirectoriesRecursive = recursive;
   };
 
   dropwidget.setDropIndication = function(enable) {
@@ -149,21 +177,48 @@ WT_DECLARE_WT_MEMBER(1, JavaScriptConstructor, "WFileDropWidget", function(APP, 
       return;
     }
 
-    self.addFiles(e.dataTransfer.files);
+    self.addDataTransferItems(Array.from(e.dataTransfer.items));
+  };
+
+  this.addDataTransferItems = async function(itemsList) {
+    const newKeys = [];
+    const wkItems = itemsList.map((item) => item.webkitGetAsEntry());
+    for (const entry of wkItems) {
+      const dropItem = createDropItemObject(entry);
+      if (entry.isFile) {
+        const file = await getEntryFile(entry);
+        dropItem["type"] = file.type;
+        dropItem["size"] = file.size;
+        const upload = addUpload(file);
+        dropItem["id"] = upload.id;
+      } else if (entry.isDirectory) {
+        if (acceptDirectories) {
+          dropItem["contents"] = [];
+          await addDirectoryFiles(entry, dropItem, acceptDirectoriesRecursive);
+        } else {
+          console.warn("directory drop not enabled, ignoring entry", entry);
+          continue;
+        }
+      }
+
+      newKeys.push(dropItem);
+    }
+    if (newKeys.length === 0) {
+      return;
+    }
+    console.log("All newKeys: ", newKeys);
+    APP.emit(dropwidget, "dropsignal", JSON.stringify(newKeys));
   };
 
   this.addFiles = function(filesList) {
     const newKeys = [];
     for (const file of filesList) {
-      const upload = new Object();
-      upload.id = Math.floor(Math.random() * Math.pow(2, 31));
-      upload.file = file;
-
-      uploads.push(upload);
+      const upload = addUpload(file);
 
       const newUpload = {};
       newUpload["id"] = upload.id;
       newUpload["filename"] = upload.file.name;
+      newUpload["path"] = upload.file.name;
       newUpload["type"] = upload.file.type;
       newUpload["size"] = upload.file.size;
 
@@ -173,8 +228,62 @@ WT_DECLARE_WT_MEMBER(1, JavaScriptConstructor, "WFileDropWidget", function(APP, 
     APP.emit(dropwidget, "dropsignal", JSON.stringify(newKeys));
   };
 
+  async function addDirectoryFiles(dirEntry, parentDropItem, recursive) {
+    const dirEntries = await getDirectoryEntries(dirEntry);
+    for (let i = 0; i < dirEntries.length; i++) {
+      const entry = dirEntries[i];
+      const dropItem = createDropItemObject(entry);
+      if (entry.isFile) {
+        const file = await getEntryFile(entry);
+        dropItem["type"] = file.type;
+        dropItem["size"] = file.size;
+        const upload = addUpload(file);
+        dropItem["id"] = upload.id;
+      } else if (entry.isDirectory) {
+        dropItem["contents"] = [];
+        if (recursive) {
+          await addDirectoryFiles(entry, dropItem, recursive);
+        }
+      }
+
+      parentDropItem["contents"].push(dropItem);
+    }
+  }
+
+  function createDropItemObject(fsEntry) {
+    const dropItem = {};
+    dropItem["path"] = fsEntry.fullPath;
+    dropItem["filename"] = fsEntry.name;
+    return dropItem;
+  }
+
+  function getEntryFile(entry) {
+    return new Promise((resolve) => {
+      entry.file(function(result) {
+        resolve(result);
+      });
+    });
+  }
+
+  function addUpload(file) {
+    const upload = new Object();
+    upload.id = Math.floor(Math.random() * Math.pow(2, 31));
+    upload.file = file;
+    uploads.push(upload);
+    return upload;
+  }
+
+  function getDirectoryEntries(dirEntry) {
+    return new Promise((resolve) => {
+      const dirReader = dirEntry.createReader();
+      dirReader.readEntries(function(results) {
+        resolve(results);
+      });
+    });
+  }
+
   dropwidget.addEventListener("click", function() {
-    if (acceptDrops) {
+    if (acceptDrops && filePickerType !== "none") {
       hiddenInput.value = "";
       hiddenInput.click();
     }
@@ -192,7 +301,7 @@ WT_DECLARE_WT_MEMBER(1, JavaScriptConstructor, "WFileDropWidget", function(APP, 
     }
 
     if (!sending) {
-      if (uploads[0].ready) {
+      if (uploads.length > 0 && uploads[0].ready) {
         self.requestSend();
       }
     }
@@ -214,15 +323,25 @@ WT_DECLARE_WT_MEMBER(1, JavaScriptConstructor, "WFileDropWidget", function(APP, 
       APP.emit(dropwidget, "filetoolarge", upload.file.size);
       self.uploadFinished(null);
       return;
+    } else if (typeof dropwidget.wtUseCustomSend === "boolean") {
+      if (typeof dropwidget.wtCustomSend !== "function") {
+        console.log(
+          "Warning: wtUseCustomSend is set, but wtCustomSend is not properly defined as a function. " +
+            "Falling back to the default upload mechanism"
+        );
+      } else if (dropwidget.wtUseCustomSend) {
+        self.validFileCheck(upload, dropwidget.wtCustomSend, url);
+        return;
+      }
     } else {
       const sendFn = (uploadWorker !== null && useFilter) ?
         self.workerSend :
         self.actualSend;
-      self.validFileCheck(upload.file, sendFn, url);
+      self.validFileCheck(upload, sendFn, url);
     }
   };
 
-  this.actualSend = function(isValid, url) {
+  this.actualSend = function(isValid, url, _upload) {
     if (!isValid) {
       self.uploadFinished(null);
       return;
@@ -243,7 +362,7 @@ WT_DECLARE_WT_MEMBER(1, JavaScriptConstructor, "WFileDropWidget", function(APP, 
     xhr.send(fd);
   };
 
-  this.workerSend = function(isValid, url) {
+  this.workerSend = function(isValid, url, _upload) {
     if (!isValid) {
       self.uploadFinished(null);
       return;
@@ -296,7 +415,7 @@ WT_DECLARE_WT_MEMBER(1, JavaScriptConstructor, "WFileDropWidget", function(APP, 
     }
   };
 
-  hiddenInput.onchange = function() {
+  const fileSelectionHandler = function() {
     if (!acceptDrops) {
       return;
     }
@@ -306,6 +425,67 @@ WT_DECLARE_WT_MEMBER(1, JavaScriptConstructor, "WFileDropWidget", function(APP, 
 
     self.addFiles(this.files);
   };
+  hiddenInput.onchange = fileSelectionHandler;
+  serverFileInput.onchange = fileSelectionHandler;
+
+  const dirSelectionHandler = function() {
+    if (!acceptDrops) {
+      return;
+    }
+    if (this.files === null || this.files.length === 0) {
+      return;
+    }
+
+    /* Directory selection simply returns a list of files. This code tries
+     * to reconstruct the FS tree structure (as returned by the drag-drop API)
+     * based on the webkitRelativePath of these files.
+     */
+    const items = [];
+    for (let i = 0; i < this.files.length; i++) {
+      addFileToItems(items, this.files[i]);
+    }
+    APP.emit(dropwidget, "dropsignal", JSON.stringify(items));
+  };
+  serverDirInput.onchange = dirSelectionHandler;
+
+  function addFileToItems(items, file) {
+    const path = file.webkitRelativePath;
+    const pathParts = path.split("/");
+    if (!acceptDirectoriesRecursive && pathParts.length > 2) {
+      return;
+    }
+
+    let dirItem = null;
+    let partialPath = "";
+    for (let i = 0; i < pathParts.length - 1; i++) {
+      const pathPart = pathParts[i];
+      partialPath += "/" + pathPart;
+      const existingDirItem = items.find((item) => item.path === partialPath);
+      if (!existingDirItem) {
+        const newDirItem = {};
+        newDirItem["path"] = partialPath;
+        newDirItem["filename"] = pathPart;
+        newDirItem["contents"] = [];
+        if (dirItem === null) {
+          items.push(newDirItem);
+        } else {
+          dirItem.contents.push(newDirItem);
+        }
+        dirItem = newDirItem;
+      } else {
+        dirItem = existingDirItem;
+      }
+      items = dirItem.contents;
+    }
+    const fileItem = {};
+    const upload = addUpload(file);
+    fileItem["id"] = upload.id;
+    fileItem["path"] = "/" + path;
+    fileItem["filename"] = file.name;
+    fileItem["type"] = file.type;
+    fileItem["size"] = file.size;
+    dirItem.contents.push(fileItem);
+  }
 
   this.setPageHoverStyle = function() {
     if (dropIndication || bodyDropForward) {
@@ -337,6 +517,7 @@ WT_DECLARE_WT_MEMBER(1, JavaScriptConstructor, "WFileDropWidget", function(APP, 
 
   dropwidget.setFilters = function(acceptAttributes) {
     hiddenInput.setAttribute("accept", acceptAttributes);
+    serverFileInput.setAttribute("accept", acceptAttributes);
   };
 
   dropwidget.setUploadWorker = function(url) {
@@ -365,5 +546,18 @@ WT_DECLARE_WT_MEMBER(1, JavaScriptConstructor, "WFileDropWidget", function(APP, 
   dropwidget.destructor = function() {
     document.body.removeEventListener("dragenter", bodyDragEnter);
     document.body.removeChild(dropcover);
+  };
+
+  dropwidget.setOnClickFilePicker = function(type) {
+    if (type === "directory-selection") {
+      dropwidget.hiddenInput.setAttribute("webkitdirectory", "webkitdirectory");
+    } else {
+      dropwidget.hiddenInput.removeAttribute("webkitdirectory");
+      if (type !== "file-selection" && type !== "none") {
+        console.warn("unknown filepicker type; using 'file-selection'", type);
+        type = "file-selection";
+      }
+    }
+    filePickerType = type;
   };
 });

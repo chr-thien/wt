@@ -3,15 +3,16 @@
  *
  * See the LICENSE file for terms of use.
  */
-
 #include "Wt/Auth/AbstractUserDatabase.h"
 #include "Wt/Auth/AuthService.h"
 #include "Wt/Auth/HashFunction.h"
 #include "Wt/Auth/Identity.h"
 #include "Wt/Auth/User.h"
 #include "Wt/Auth/MailUtils.h"
+
 #include "Wt/Mail/Client.h"
 #include "Wt/Mail/Message.h"
+
 #include "Wt/WApplication.h"
 #include "Wt/WRandom.h"
 
@@ -134,7 +135,11 @@ AuthService::AuthService()
     emailTokenValidity_(3 * 24 * 60),  // three days
     authTokens_(false),
     authTokenUpdateEnabled_(true),
-    authTokenValidity_(14 * 24 * 60)   // two weeks
+    authTokenValidity_(14 * 24 * 60),  // two weeks
+    mfaRequired_(false),
+    mfaCodeLength_(6),
+    mfaTokenValidity_(90 * 24 * 60),   // 90 days
+    mfaThrottleEnabled_(false)
 {
   redirectInternalPath_ = "/auth/mail/";
 }
@@ -172,6 +177,9 @@ void AuthService::setAuthTokensEnabled(bool enabled, const std::string& cookieNa
   authTokens_ = enabled;
   authTokenCookieName_ = cookieName;
   authTokenCookieDomain_ = cookieDomain;
+
+  setMfaTokenCookieName(cookieName + "-mfa");
+  setMfaTokenCookieDomain(cookieDomain);
 }
 
 User AuthService::identifyUser(const Identity& identity,
@@ -230,7 +238,24 @@ HashFunction *AuthService::tokenHashFunction() const
   return tokenHashFunction_.get();
 }
 
-std::string AuthService::createAuthToken(const User& user) const
+std::string AuthService::createAuthToken(const User& user, AuthTokenType authTokenType) const
+{
+  int authTokenValidity;
+  switch (authTokenType) {
+  case AuthTokenType::Password:
+    authTokenValidity = authTokenValidity_;
+    break;
+  case AuthTokenType::MFA:
+    authTokenValidity = mfaTokenValidity_;
+    break;
+  default:
+    throw WException("Auth: createAuthToken(): invalid AuthTokenType");
+  }
+
+  return createAuthToken(user, authTokenValidity);
+}
+
+std::string AuthService::createAuthToken(const User& user, int authTokenValidity) const
 {
   if (!user.isValid())
     throw WException("Auth: createAuthToken(): user invalid");
@@ -241,8 +266,12 @@ std::string AuthService::createAuthToken(const User& user) const
   std::string random = WRandom::generateId(tokenLength_);
   std::string hash = tokenHashFunction()->compute(random, std::string());
 
+  if (authTokenValidity < 0) {
+    authTokenValidity = authTokenValidity_;
+  }
+  
   Token token
-    (hash, WDateTime::currentDateTime().addSecs(authTokenValidity_ * 60));
+    (hash, WDateTime::currentDateTime().addSecs(authTokenValidity * 60));
   user.addAuthToken(token);
 
   if (t.get()) t->commit();
@@ -252,6 +281,32 @@ std::string AuthService::createAuthToken(const User& user) const
 
 AuthTokenResult AuthService::processAuthToken(const std::string& token,
                                               AbstractUserDatabase& users) const
+{
+  return processAuthToken(token, users, -1);
+}
+
+AuthTokenResult AuthService::processAuthToken(const std::string& token,
+                                              AbstractUserDatabase& users,
+                                              AuthTokenType authTokenType) const
+{
+  int authTokenValidity;
+  switch (authTokenType) {
+  case AuthTokenType::Password:
+    authTokenValidity = authTokenValidity_;
+    break;
+  case AuthTokenType::MFA:
+    authTokenValidity = mfaTokenValidity_;
+    break;
+  default:
+    throw WException("Auth: processAuthToken(): invalid AuthTokenType");
+  }
+
+  return processAuthToken(token, users, authTokenValidity);
+}
+
+AuthTokenResult AuthService::processAuthToken(const std::string& token,
+                                              AbstractUserDatabase& users,
+                                              int authTokenValidity) const
 {
   std::unique_ptr<AbstractUserDatabase::Transaction> t(users.startTransaction());
 
@@ -271,8 +326,11 @@ AuthTokenResult AuthService::processAuthToken(const std::string& token,
          * token.
          */
         user.removeAuthToken(hash);
-        newToken = createAuthToken(user);
-        validity = authTokenValidity_ * 60;
+        if (authTokenValidity < 0) {
+          authTokenValidity = authTokenValidity_;
+        }
+        newToken = createAuthToken(user, authTokenValidity);
+        validity = authTokenValidity * 60;
       }
 
       if (t.get())
@@ -462,5 +520,39 @@ void AuthService::sendMail(const Mail::Message& message) const
   MailUtils::sendMail(m);
 }
 
-  }
+void AuthService::setMfaProvider(const std::string& provider)
+{
+  mfaProvider_ = provider;
+}
+
+void AuthService::setMfaRequired(bool require)
+{
+  mfaRequired_ = require;
+}
+
+void AuthService::setMfaCodeLength(int length)
+{
+  mfaCodeLength_ = length;
+}
+
+void AuthService::setMfaTokenCookieName(const std::string& name)
+{
+  mfaTokenCookieName_ = name;
+}
+
+void AuthService::setMfaTokenCookieDomain(const std::string& domain)
+{
+  mfaTokenCookieDomain_ = domain;
+}
+
+void AuthService::setMfaTokenValidity(int validity)
+{
+  mfaTokenValidity_ = validity;
+}
+
+void AuthService::setMfaThrottleEnabled(bool enabled)
+{
+  mfaThrottleEnabled_ = enabled;
+}
+}
 }
